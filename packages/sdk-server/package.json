@@ -3,17 +3,19 @@
   "version": "1.0.0",
   "description": "Server middleware, x402 resource server gateway, and webhooks for PulsePay",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "node test/x402.test.mjs"
   },
   "dependencies": {
     "@pulsepay/shared": "workspace:*",
     "@pulsepay/adapter-hedera": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "typescript": "^5.7.3"
   }
 }

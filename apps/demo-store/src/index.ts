@@ -1,7 +1,7 @@
 import http, { IncomingMessage, ServerResponse } from "http";
 import { parse } from "url";
 import crypto from "crypto";
-import { handleX402PaymentCheck, generateX402Manifest, formatAccountantCsv } from "@pulsepay/sdk-server";
+import { handleX402PaymentCheck, generateX402Manifest, getVerifiedHederaPayments, formatAccountantCsv } from "@pulsepay/sdk-server";
 import {
   WHITECHAIN_SEPOLIA_CHAIN_ID,
   WHITECHAIN_USDT_ADDRESS,
@@ -13,6 +13,8 @@ import {
 } from "@pulsepay/shared";
 
 const PORT = process.env.PORT || 3000;
+const merchantAccountId = process.env.HEDERA_MERCHANT_ACCOUNT_ID;
+if (!merchantAccountId || !/^\d+\.\d+\.\d+$/.test(merchantAccountId)) throw new Error("Set HEDERA_MERCHANT_ACCOUNT_ID to a testnet account you control");
 
 // ============================================================================
 // Data Stores & Live State
@@ -80,7 +82,7 @@ const merchantState = {
     availableProceedsUsdt: 9984.0,
     refundReserveBalanceUsdt: 2496.0,
     uniswapConvertedSalesUsdt: 4250.0,
-    agentRevenueHbar: 71.0,
+    agentRevenueHbar: 0,
     mrrUsdt: 4120.0,
     activeSubscribersCount: 38,
     totalInvoicesCount: 184,
@@ -105,13 +107,13 @@ const merchantState = {
     },
   } as UniswapConfig,
   agentCommerce: {
-    hcsTopicId: "0.0.789123",
-    merchantAccountId: "0.0.12345",
-    totalAgentCalls: 142,
-    totalHbarTinybars: 7100000000n,
-    dailyBudgetHbar: 50.0,
-    maxPerRequestHbar: 1.0,
-    allowlist: ["0.0.12345", "0.0.67890"],
+    hcsTopicId: process.env.HEDERA_AUDIT_TOPIC_ID || "",
+    merchantAccountId,
+    totalAgentCalls: 0,
+    totalHbarTinybars: 0n,
+    dailyBudgetHbar: Number(process.env.HEDERA_DAILY_BUDGET_TINYBARS || "10") / 1e8,
+    maxPerRequestHbar: Number(process.env.HEDERA_MAX_PAYMENT_TINYBARS || "1") / 1e8,
+    allowlist: [merchantAccountId],
   } as AgentCommerceState,
   webhooks: {
     endpoint: "https://api.acmestudio.com/webhooks/pulsepay",
@@ -265,20 +267,6 @@ const mockActivities: NormalizedActivity[] = [
     timestamp: Math.floor(Date.now() / 1000) - 900,
   },
   {
-    id: "act_hedera_01",
-    chainKey: "hedera",
-    eventType: "AGENT_SPEND_SETTLED",
-    from: "0.0.456789",
-    to: "0.0.12345",
-    asset: "HBAR",
-    amountFormatted: "0.50 HBAR",
-    amountRaw: "50000000",
-    status: "CONFIRMED",
-    txId: "0.0.456789@1730851200.000",
-    explorerUrl: "https://hashscan.io/testnet/transaction/0.0.456789@1730851200.000",
-    timestamp: Math.floor(Date.now() / 1000) - 600,
-  },
-  {
     id: "act_uniswap_01",
     chainKey: "uniswap",
     eventType: "TREASURY_SWAP",
@@ -303,8 +291,8 @@ const acmeServices = [
     price: {
       network: "hedera:testnet" as const,
       asset: "0.0.0", // Native HBAR
-      amountTinybars: "50000000", // 0.50 HBAR
-      payTo: "0.0.12345",
+      amountTinybars: process.env.HEDERA_SERVICE_PRICE_TINYBARS || "1",
+      payTo: merchantAccountId,
     },
   },
   {
@@ -315,7 +303,7 @@ const acmeServices = [
       network: "hedera:testnet" as const,
       asset: "0.0.0",
       amountTinybars: "120000000", // 1.20 HBAR
-      payTo: "0.0.12345",
+      payTo: merchantAccountId,
     },
   },
 ];
@@ -343,7 +331,15 @@ function parseJsonBody<T>(req: IncomingMessage): Promise<T> {
 // HTTP Server & Routing
 // ============================================================================
 
-const server = http.createServer(async (req: IncomingMessage, res: ServerResponse) => {
+const server = http.createServer((req: IncomingMessage, res: ServerResponse) => {
+  void handleRequest(req, res).catch((error) => {
+    console.error("Request failed:", error.message);
+    if (!res.headersSent) res.writeHead(503, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Service unavailable" }));
+  });
+});
+
+async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   const parsed = parse(req.url || "/", true);
   const pathname = parsed.pathname || "/";
 
@@ -351,6 +347,7 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, PAYMENT-SIGNATURE, x-api-key");
+  res.setHeader("Access-Control-Expose-Headers", "PAYMENT-REQUIRED, PAYMENT-RESPONSE");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -360,19 +357,22 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
 
   // --- API: Get Live Merchant State ---
   if (pathname === "/api/merchant/state" && req.method === "GET") {
+    const verifiedPayments = getVerifiedHederaPayments();
+    const totalHbarTinybars = verifiedPayments.reduce((sum, payment) => sum + BigInt(payment.amount), 0n);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
-        metrics: merchantState.metrics,
+        metrics: { ...merchantState.metrics, agentRevenueHbar: Number(totalHbarTinybars) / 1e8 },
         invoices: storeInvoices,
         subscriptions: storeSubscriptions,
         uniswap: merchantState.uniswap,
         agentCommerce: {
           ...merchantState.agentCommerce,
-          totalHbarTinybars: merchantState.agentCommerce.totalHbarTinybars.toString(),
+          totalAgentCalls: verifiedPayments.length,
+          totalHbarTinybars: totalHbarTinybars.toString(),
         },
         services: acmeServices,
-        activities: mockActivities,
+        activities: [...mockActivities, ...hederaActivities()],
         webhooks: merchantState.webhooks,
       })
     );
@@ -713,7 +713,7 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
   // Route 2: Hedera x402 Protected Resource Endpoint
   if (pathname === "/v1/services/market-data-pro/query" && req.method === "POST") {
     const paymentSignature = req.headers["payment-signature"] as string | undefined;
-    const check = handleX402PaymentCheck(acmeServices[0], paymentSignature);
+    const check = await handleX402PaymentCheck(acmeServices[0], paymentSignature);
 
     if (!check.authorized) {
       res.writeHead(check.statusCode, check.headers);
@@ -722,9 +722,6 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
     }
 
     // Settled payload returned only after payment
-    merchantState.agentCommerce.totalAgentCalls += 1;
-    merchantState.agentCommerce.totalHbarTinybars += 50000000n;
-    merchantState.metrics.agentRevenueHbar += 0.5;
 
     res.writeHead(200, {
       ...check.headers,
@@ -756,8 +753,13 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
   }
 
   // Route 3: Accountant CSV Export
+  if (pathname === "/api/hedera/payments" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(getVerifiedHederaPayments()));
+    return;
+  }
   if (pathname === "/api/export.csv" && req.method === "GET") {
-    const csvData = formatAccountantCsv(mockActivities);
+    const csvData = formatAccountantCsv([...mockActivities, ...hederaActivities()]);
     res.writeHead(200, {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="pulsepay-ledger-${Date.now()}.csv"`,
@@ -773,6 +775,15 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
     return;
   }
 
+  if (pathname.startsWith("/receipt/hedera/") && req.method === "GET") {
+    const id = pathname.slice("/receipt/hedera/".length);
+    const payment = hederaActivities().find(p => p.txId === id);
+    if (!payment) { res.writeHead(404); res.end("Verified receipt not found"); return; }
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(`<!doctype html><html lang="en"><meta charset="utf-8"><title>Hedera payment receipt</title><h1>Verified Hedera payment</h1><p>${payment.amountFormatted}</p><p>From ${payment.from} to ${payment.to}</p><p>Transaction ${payment.txId}</p><a href="${payment.explorerUrl}">Verify on HashScan</a></html>`);
+    return;
+  }
+
   // Route 5: Customer Receipt View
   if (pathname.startsWith("/receipt") && req.method === "GET") {
     const parts = pathname.split("/");
@@ -785,7 +796,15 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
   // Route 6: Acme Studio Storefront with Drop-in PulsePay Checkout
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(renderStorefrontHtml());
-});
+}
+
+function hederaAmount(amount: bigint): string { return `${amount / 100000000n}.${(amount % 100000000n).toString().padStart(8, "0")}`; }
+function hederaActivities(): NormalizedActivity[] {
+  return getVerifiedHederaPayments().map(p => ({ id: p.transactionId!, chainKey: "hedera", eventType: "AGENT_SPEND_SETTLED",
+    from: p.payer!, to: p.recipient, asset: "HBAR", amountRaw: p.amount, amountFormatted: `${hederaAmount(BigInt(p.amount))} HBAR`,
+    status: "CONFIRMED", txId: p.transactionId!, explorerUrl: `https://hashscan.io/${p.network === "hedera:mainnet" ? "mainnet" : "testnet"}/transaction/${p.transactionId}`,
+    timestamp: Math.floor(Number(p.consensusTimestamp)) }));
+}
 
 // ============================================================================
 // HTML Renderers
@@ -1192,8 +1211,8 @@ function renderMerchantHtml() {
           </div>
 
           <div class="card">
-            <div class="card-title">Hedera AI Agent Revenue <span style="color: #38bdf8;">142 Queries</span></div>
-            <div class="card-val" id="kpi-agent">71.00 HBAR</div>
+            <div class="card-title">Hedera AI Agent Revenue <span style="color: #38bdf8;" id="kpi-agent-calls">${getVerifiedHederaPayments().length} Queries</span></div>
+            <div class="card-val" id="kpi-agent">${hederaAmount(getVerifiedHederaPayments().reduce((sum, p) => sum + BigInt(p.amount), 0n))} HBAR</div>
             <div class="card-sub">x402 native tinybars consensus-settled</div>
           </div>
 
@@ -1524,23 +1543,23 @@ function renderMerchantHtml() {
             <div>
               <div style="font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">Hedera Agent Kit v4 Governance</div>
               <h3 style="font-size: 17px; font-weight: 700; margin-top: 2px;">PulsePaySpendLimitPolicy & Consensus Audit</h3>
-              <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">100% Native TypeScript SDK (@hashgraph/sdk) — Zero Solidity on Hedera!</p>
+              <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">100% Native TypeScript SDK (@hiero-ledger/sdk) — Zero Solidity on Hedera!</p>
             </div>
             <div>
-              <span class="badge-paid" style="font-size: 12px; background: rgba(14,165,233,0.15); color: #38bdf8; border-color: rgba(14,165,233,0.3);">HCS TOPIC: 0.0.789123</span>
+              <span class="badge-paid" style="font-size: 12px; background: rgba(14,165,233,0.15); color: #38bdf8; border-color: rgba(14,165,233,0.3);">HCS TOPIC: ${merchantState.agentCommerce.hcsTopicId || "Not configured"}</span>
             </div>
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
             <div>
               <div style="font-size: 11px; color: var(--text-muted);">Daily Spend Budget</div>
-              <div style="font-size: 18px; font-weight: 700;">50.00 HBAR</div>
+              <div style="font-size: 18px; font-weight: 700;">${merchantState.agentCommerce.dailyBudgetHbar.toFixed(8)} HBAR</div>
               <div style="font-size: 11px; color: var(--brand-emerald); margin-top: 2px;">Per-agent threshold</div>
             </div>
             <div>
               <div style="font-size: 11px; color: var(--text-muted);">Max Per-Request Limit</div>
-              <div style="font-size: 18px; font-weight: 700;">1.00 HBAR</div>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">100,000,000 tinybars</div>
+              <div style="font-size: 18px; font-weight: 700;">${merchantState.agentCommerce.maxPerRequestHbar.toFixed(8)} HBAR</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${Math.round(merchantState.agentCommerce.maxPerRequestHbar * 1e8)} tinybars</div>
             </div>
             <div>
               <div style="font-size: 11px; color: var(--text-muted);">Human Approvals Needed</div>
@@ -1549,7 +1568,7 @@ function renderMerchantHtml() {
             </div>
             <div>
               <div style="font-size: 11px; color: var(--text-muted);">Audit Topic HashScan</div>
-              <a href="https://hashscan.io/testnet/topic/0.0.789123" target="_blank" style="color: #38bdf8; font-size: 13px; text-decoration: underline; display: inline-block; margin-top: 4px;">HashScan Topic Explorer ↗</a>
+              <a href="${merchantState.agentCommerce.hcsTopicId ? `https://hashscan.io/testnet/topic/${merchantState.agentCommerce.hcsTopicId}` : "#"}" target="_blank" style="color: #38bdf8; font-size: 13px; text-decoration: underline; display: inline-block; margin-top: 4px;">HashScan Topic Explorer ↗</a>
             </div>
           </div>
         </div>
@@ -1657,7 +1676,7 @@ function renderMerchantHtml() {
             </div>
             <div style="background: #0c121e; padding: 12px; border-radius: 8px;">
               <div style="font-size: 11px; color: var(--text-muted);">Hedera HCS Audit Topic (Testnet 296)</div>
-              <div style="font-family: monospace; color: #38bdf8; margin-top: 4px;">0.0.789123</div>
+              <div style="font-family: monospace; color: #38bdf8; margin-top: 4px;">${merchantState.agentCommerce.hcsTopicId || "Not configured"}</div>
             </div>
           </div>
         </div>
@@ -1821,7 +1840,8 @@ function renderMerchantHtml() {
       document.getElementById('kpi-available').innerText = '$' + appState.metrics.availableProceedsUsdt.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' USDT';
       document.getElementById('kpi-reserve').innerText = '$' + appState.metrics.refundReserveBalanceUsdt.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' USDT';
       document.getElementById('kpi-uniswap').innerText = '$' + appState.metrics.uniswapConvertedSalesUsdt.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' USDT';
-      document.getElementById('kpi-agent').innerText = appState.metrics.agentRevenueHbar.toFixed(2) + ' HBAR';
+      document.getElementById('kpi-agent').innerText = appState.metrics.agentRevenueHbar.toFixed(8) + ' HBAR';
+      document.getElementById('kpi-agent-calls').innerText = appState.agentCommerce.totalAgentCalls + ' Queries';
       document.getElementById('kpi-mrr').innerText = '$' + appState.metrics.mrrUsdt.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' USDT';
 
       const tbody = document.getElementById('overview-activity-tbody');
