@@ -6,8 +6,8 @@
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "inputs": ["src/**/*.tsx", "src/**/*.ts", "test/**/*.ts"]
+      "dependsOn": ["build"],
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "test/**/*.ts", "test/**/*.mjs"]
     },
     "lint": {},
     "dev": {

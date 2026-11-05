@@ -1,125 +1,47 @@
-import { Client } from "@hashgraph/sdk";
+import { Client, Transaction } from "@hiero-ledger/sdk";
+import { BaseTool as KitBaseTool, AbstractHook, AbstractPolicy, AgentMode } from "@hashgraph/hedera-agent-kit";
+import type { Context, Plugin, Tool, PreToolExecutionParams, PostParamsNormalizationParams, PostSecondaryActionParams } from "@hashgraph/hedera-agent-kit";
+import type { HederaMirrorClient } from "./mirror.js";
 
-export interface HederaContext {
+export { AbstractHook, AbstractPolicy, AgentMode };
+export type { Plugin, Tool, PreToolExecutionParams, PostParamsNormalizationParams, PostSecondaryActionParams };
+
+export interface HederaContext extends Context {
   client?: Client;
   operatorAccountId?: string;
   auditTopicId?: string;
-  metadata?: Record<string, unknown>;
+  network?: "testnet" | "mainnet";
+  mirror?: HederaMirrorClient;
+  maxTransactionFeeTinybars?: bigint;
+  storageDirectory?: string;
+  submitTransaction?: (tx: Transaction) => Promise<{ transactionId: string; consensusStatus: string }>;
+  executionId?: object;
+  submissionStarted?: boolean;
 }
 
-export interface PreToolExecutionParams {
-  context: HederaContext;
-  rawParams: Record<string, any>;
-  client?: Client;
-}
-
-export interface PostParamsNormalizationParams {
-  context: HederaContext;
-  rawParams: Record<string, any>;
-  normalisedParams: Record<string, any>;
-  client?: Client;
-}
-
-export interface PostSecondaryActionParams {
-  context: HederaContext;
-  toolResult: any;
-  client?: Client;
-}
-
-export abstract class AbstractHook {
-  abstract name: string;
-  abstract description?: string;
-  abstract relevantTools: string[];
-
-  async preToolExecutionHook(_params: PreToolExecutionParams, _method: string): Promise<any> {}
-  async postParamsNormalizationHook(_params: PostParamsNormalizationParams, _method: string): Promise<any> {}
-  async postToolExecutionHook(_params: PostSecondaryActionParams, _method: string): Promise<any> {}
-}
-
-export abstract class AbstractPolicy extends AbstractHook {
-  protected shouldBlockPreToolExecution(_params: PreToolExecutionParams, _method: string): boolean | Promise<boolean> {
-    return false;
-  }
-
-  protected shouldBlockPostParamsNormalization(_params: PostParamsNormalizationParams, _method: string): boolean | Promise<boolean> {
-    return false;
-  }
-
-  override async preToolExecutionHook(params: PreToolExecutionParams, method: string): Promise<any> {
-    const shouldBlock = await this.shouldBlockPreToolExecution(params, method);
-    if (shouldBlock) {
-      throw new Error(`[Policy Blocked] ${this.name} rejected tool execution before invocation.`);
+/** Accept both the SDK API and the official Agent Kit (client, context, params) call. */
+export abstract class BaseTool extends KitBaseTool {
+  private registeredHooks: AbstractHook[] = [];
+  protected defaultContext: HederaContext;
+  constructor(context: HederaContext = {}) { super(); this.defaultContext = context; }
+  registerHook(hook: AbstractHook) { this.registeredHooks.push(hook); }
+  override async execute(first: any, second: HederaContext = {}, third?: any): Promise<any> {
+    const kitCall = third !== undefined;
+    const context: HederaContext = { ...this.defaultContext, ...second, executionId: {}, submissionStarted: false };
+    const supplied = [...(this.defaultContext.hooks || []), ...(second.hooks || []), ...this.registeredHooks];
+    context.hooks = [...new Set(supplied)];
+    const client = kitCall ? first as Client : context.client;
+    context.client = client;
+    context.operatorAccountId ||= context.accountId || client?.operatorAccountId?.toString();
+    context.accountId ||= context.operatorAccountId;
+    try {
+      return await super.execute(client as Client, context, kitCall ? third : first);
+    } catch (error) {
+      for (const hook of context.hooks) {
+        if ("executionFailed" in hook && typeof hook.executionFailed === "function") hook.executionFailed(context);
+      }
+      throw error;
     }
   }
-
-  override async postParamsNormalizationHook(params: PostParamsNormalizationParams, method: string): Promise<any> {
-    const shouldBlock = await this.shouldBlockPostParamsNormalization(params, method);
-    if (shouldBlock) {
-      throw new Error(`[Policy Blocked] ${this.name} rejected tool execution after parameters validation.`);
-    }
-  }
+  override async handleError(error: unknown): Promise<never> { throw error; }
 }
-
-export interface Tool {
-  method: string;
-  name: string;
-  description: string;
-  parameters: any;
-  execute: (params: any, context?: HederaContext) => Promise<any>;
-}
-
-export abstract class BaseTool implements Tool {
-  abstract method: string;
-  abstract name: string;
-  abstract description: string;
-  abstract parameters: any;
-
-  protected hooks: AbstractHook[] = [];
-
-  public registerHook(hook: AbstractHook) {
-    this.hooks.push(hook);
-  }
-
-  abstract normalizeParams(rawParams: any, context: HederaContext): Promise<any>;
-  abstract coreAction(normalisedParams: any, context: HederaContext): Promise<any>;
-  abstract secondaryAction(coreResult: any, context: HederaContext): Promise<any>;
-
-  async execute(rawParams: any, context: HederaContext = {}): Promise<any> {
-    // Stage 1: Pre-tool execution hooks & policies
-    for (const hook of this.hooks) {
-      await hook.preToolExecutionHook({ context, rawParams, client: context.client }, this.method);
-    }
-
-    // Stage 2: Normalization
-    const normalisedParams = await this.normalizeParams(rawParams, context);
-
-    // Stage 3: Post-params normalization hooks & policies
-    for (const hook of this.hooks) {
-      await hook.postParamsNormalizationHook(
-        { context, rawParams, normalisedParams, client: context.client },
-        this.method
-      );
-    }
-
-    // Stage 4: Core action
-    const coreResult = await this.coreAction(normalisedParams, context);
-
-    // Stage 6: Secondary action (execution / submission)
-    const toolResult = await this.secondaryAction(coreResult, context);
-
-    // Stage 7: Post-tool execution hooks
-    for (const hook of this.hooks) {
-      await hook.postToolExecutionHook({ context, toolResult, client: context.client }, this.method);
-    }
-
-    return toolResult;
-  }
-}
-
-export interface Plugin {
-  name: string;
-  version?: string;
-  description?: string;
-  tools: (context: HederaContext) => Tool[];
-}
-

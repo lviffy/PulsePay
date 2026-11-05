@@ -123,6 +123,10 @@ ETHGLOBAL/
 
 ---
 
+## Hedera verification status
+
+The Hedera adapter now uses the official Agent Kit and SDK, verifies native payment receipts, enforces spend limits and refund bounds, and persists audit retries. See [Hedera setup, protocol scope and live evidence](docs/HEDERA.md). The native receipt extension is not a standardized x402 facilitator integration. Older demo claims below should be read with that scope.
+
 ## ⚡ Quickstart & Verification Guide
 
 ### Prerequisites
@@ -152,7 +156,7 @@ forge test
 ```
 *Tests allowed treasury swaps, blocked oversized swaps, circuit breaker emergency pause, and permission bitmask validation.*
 
-### 3. Run Hedera Agent Kit v4 Integration Tests (6 Passed)
+### 3. Run Hedera Adapter Regression Tests (20 Cases)
 ```bash
 node packages/adapter-hedera/test/hedera.test.mjs
 ```

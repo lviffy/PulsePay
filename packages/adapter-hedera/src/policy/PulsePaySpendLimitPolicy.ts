@@ -1,102 +1,89 @@
-import { AbstractPolicy, PreToolExecutionParams, PostParamsNormalizationParams } from "../types.js";
+import { AbstractPolicy, HederaContext, PreToolExecutionParams, PostParamsNormalizationParams, PostSecondaryActionParams } from "../types.js";
+import { amountTinybarsSchema } from "../transactions.js";
+import { readJson, writeJson } from "../storage/json.js";
+import { mirrorTransactionId } from "../mirror.js";
 
 export interface SpendPolicyConfig {
   dailyBudgetTinybars: bigint;
   maxPerRequestTinybars: bigint;
   merchantAllowlist?: string[];
   allowedTools?: string[];
+  statePath?: string;
 }
 
-/**
- * @title PulsePaySpendLimitPolicy
- * @notice Hedera Agent Kit v4 Policy extending AbstractPolicy.
- * Enforces per-request limits, daily spending budgets, and merchant account allowlists
- * at Stage 1 & Stage 3 of the BaseTool lifecycle before any transaction can be signed.
- */
 export class PulsePaySpendLimitPolicy extends AbstractPolicy {
-  public readonly name = "PulsePay Spend Limit Policy";
-  public readonly description = "Enforces per-request and daily spending limits and merchant allowlists for Hedera agents.";
-  public override relevantTools: string[];
-
-  public dailyBudgetTinybars: bigint;
-  public maxPerRequestTinybars: bigint;
-  public merchantAllowlist: Set<string>;
-
-  private dailySpentTinybars: bigint = 0n;
-  private lastResetDay: number = new Date().getUTCDate();
+  readonly name = "PulsePay Spend Limit Policy";
+  readonly description = "Enforces request limits, daily budgets and recipient allowlists before signing.";
+  relevantTools = ["*"];
+  private spent = 0n;
+  private day = new Date().toISOString().slice(0, 10);
+  private reservations = new WeakMap<object, bigint>();
+  private allowedTools: string[];
+  readonly merchantAllowlist: Set<string>;
+  readonly dailyBudgetTinybars: bigint;
+  readonly maxPerRequestTinybars: bigint;
+  private statePath?: string;
+  private prepared: Record<string, string> = {};
+  private confirmed: string[] = [];
 
   constructor(config: SpendPolicyConfig) {
     super();
+    if (config.dailyBudgetTinybars < 0n || config.maxPerRequestTinybars < 0n) throw new Error("Spending limits cannot be negative");
     this.dailyBudgetTinybars = config.dailyBudgetTinybars;
     this.maxPerRequestTinybars = config.maxPerRequestTinybars;
     this.merchantAllowlist = new Set(config.merchantAllowlist || []);
-    this.relevantTools = config.allowedTools || ["x402_pay_tool", "transfer_hbar_tool"];
-  }
-
-  private resetDailyBudgetIfNewDay() {
-    const currentDay = new Date().getUTCDate();
-    if (currentDay !== this.lastResetDay) {
-      this.dailySpentTinybars = 0n;
-      this.lastResetDay = currentDay;
+    this.allowedTools = config.allowedTools || ["x402_pay_tool", "transfer_hbar_tool"];
+    this.statePath = config.statePath;
+    if (this.statePath) {
+      const state = readJson(this.statePath, { day: this.day, spent: "0", prepared: {} as Record<string,string>, confirmed: [] as string[] });
+      if (state.day === this.day) { this.spent = BigInt(state.spent); this.prepared = state.prepared || {}; this.confirmed = state.confirmed || []; }
     }
   }
-
-  protected override shouldBlockPreToolExecution(
-    _params: PreToolExecutionParams,
-    method: string
-  ): boolean {
-    if (this.relevantTools.length > 0 && !this.relevantTools.includes(method)) {
-      throw new Error(
-        `[SpendPolicy Violation] Tool "${method}" is not in the approved allowlist.`
-      );
-    }
+  private save() { if (this.statePath) writeJson(this.statePath, { day: this.day, spent: this.spent.toString(), prepared: this.prepared, confirmed: this.confirmed }); }
+  private reset() {
+    const day = new Date().toISOString().slice(0, 10);
+    if (day !== this.day) { this.spent = 0n; this.day = day; this.prepared = {}; this.confirmed = []; this.reservations = new WeakMap(); this.save(); }
+  }
+  protected override shouldBlockPreToolExecution(_params: PreToolExecutionParams, method: string): boolean {
+    if (!this.allowedTools.includes(method)) throw new Error(`[SpendPolicy Violation] Tool "${method}" is not in the approved allowlist.`);
     return false;
   }
-
-  protected override shouldBlockPostParamsNormalization(
-    params: PostParamsNormalizationParams,
-    method: string
-  ): boolean {
-    if (!this.relevantTools.includes(method)) return false;
-
-    this.resetDailyBudgetIfNewDay();
-
-    const { normalisedParams } = params;
-    const recipient = normalisedParams.merchantAccountId || normalisedParams.toAccountId;
-    const amountTinybars: bigint = BigInt(normalisedParams.amountTinybars || 0);
-
-    // Check 1: Merchant Allowlist
-    if (this.merchantAllowlist.size > 0 && recipient && !this.merchantAllowlist.has(recipient)) {
-      throw new Error(
-        `[SpendPolicy Violation] Merchant account "${recipient}" is not on the authorized merchant allowlist.`
-      );
-    }
-
-    // Check 2: Max Per-Request Limit
-    if (this.maxPerRequestTinybars > 0n && amountTinybars > this.maxPerRequestTinybars) {
-      throw new Error(
-        `[SpendPolicy Violation] Requested spend of ${amountTinybars} tinybars exceeds maximum per-request limit of ${this.maxPerRequestTinybars} tinybars.`
-      );
-    }
-
-    // Check 3: Daily Budget
-    if (this.dailyBudgetTinybars > 0n && this.dailySpentTinybars + amountTinybars > this.dailyBudgetTinybars) {
-      const remaining = this.dailyBudgetTinybars - this.dailySpentTinybars;
-      throw new Error(
-        `[SpendPolicy Violation] Requested spend of ${amountTinybars} tinybars exceeds remaining daily budget of ${remaining} tinybars (Daily Budget: ${this.dailyBudgetTinybars} tinybars).`
-      );
-    }
-
-    // If passed, track cumulative spend
-    this.dailySpentTinybars += amountTinybars;
+  protected override shouldBlockPostParamsNormalization(params: PostParamsNormalizationParams): boolean {
+    this.reset();
+    const p = params.normalisedParams;
+    const recipient = p.merchantAccountId || p.agentAccountId || p.toAccountId;
+    const amount = amountTinybarsSchema.parse(p.amountTinybars);
+    if (this.merchantAllowlist.size && (!recipient || !this.merchantAllowlist.has(recipient))) throw new Error(`[SpendPolicy Violation] Merchant account "${recipient}" is not on the authorized merchant allowlist.`);
+    if (this.maxPerRequestTinybars > 0n && amount > this.maxPerRequestTinybars) throw new Error("Requested spend exceeds maximum per-request limit");
+    if (this.dailyBudgetTinybars > 0n && this.spent + amount > this.dailyBudgetTinybars) throw new Error("Requested spend exceeds remaining daily budget");
+    this.spent += amount;
+    const context = params.context as HederaContext;
+    if (context.executionId) this.reservations.set(context.executionId, amount);
+    this.save();
     return false;
   }
-
-  public getRemainingDailyBudgetTinybars(): bigint {
-    this.resetDailyBudgetIfNewDay();
-    return this.dailyBudgetTinybars > this.dailySpentTinybars
-      ? this.dailyBudgetTinybars - this.dailySpentTinybars
-      : 0n;
+  executionFailed(context: HederaContext) {
+    const amount = context.executionId && this.reservations.get(context.executionId);
+    if (amount !== undefined && !context.submissionStarted) { this.spent -= amount; this.reservations.delete(context.executionId!); this.save(); }
+    // Ambiguous submission errors retain the reservation to prevent accidental double spending.
   }
+  override async postToolExecutionHook(params: PostSecondaryActionParams, _method: string) {
+    const context = params.context as HederaContext;
+    if (params.toolResult.status === "PREPARED") {
+      this.prepared[mirrorTransactionId(params.toolResult.transactionId)] = String(params.normalisedParams.amountTinybars);
+      this.save();
+    }
+    if (context.executionId) this.reservations.delete(context.executionId);
+  }
+  /** Call only after independently verifying consensus; idempotent across worker restarts. */
+  recordConfirmedSpend(transactionId: string, amount: bigint) {
+    this.reset(); const id = mirrorTransactionId(transactionId);
+    if (this.confirmed.includes(id)) return;
+    if (this.prepared[id] !== undefined) {
+      if (BigInt(this.prepared[id]) !== amount) throw new Error("Prepared payment amount mismatch");
+      delete this.prepared[id];
+    } else this.spent += amount;
+    this.confirmed.push(id); this.save();
+  }
+  getRemainingDailyBudgetTinybars(): bigint { this.reset(); return this.dailyBudgetTinybars > this.spent ? this.dailyBudgetTinybars - this.spent : 0n; }
 }
-

@@ -1,6 +1,6 @@
 import http, { IncomingMessage, ServerResponse } from "http";
 import { parse } from "url";
-import { handleX402PaymentCheck, generateX402Manifest, formatAccountantCsv } from "@pulsepay/sdk-server";
+import { handleX402PaymentCheck, generateX402Manifest, getVerifiedHederaPayments, formatAccountantCsv } from "@pulsepay/sdk-server";
 import {
   WHITECHAIN_SEPOLIA_CHAIN_ID,
   WHITECHAIN_USDT_ADDRESS,
@@ -9,6 +9,8 @@ import {
 } from "@pulsepay/shared";
 
 const PORT = process.env.PORT || 3000;
+const merchantAccountId = process.env.HEDERA_MERCHANT_ACCOUNT_ID;
+if (!merchantAccountId || !/^\d+\.\d+\.\d+$/.test(merchantAccountId)) throw new Error("Set HEDERA_MERCHANT_ACCOUNT_ID to a testnet account you control");
 
 // Acme paid market data service config for Hedera x402
 const acmeServices = [
@@ -19,8 +21,8 @@ const acmeServices = [
     price: {
       network: "hedera:testnet" as const,
       asset: "0.0.0", // Native HBAR
-      amountTinybars: "50000000", // 0.50 HBAR
-      payTo: "0.0.12345",
+      amountTinybars: process.env.HEDERA_SERVICE_PRICE_TINYBARS || "1",
+      payTo: merchantAccountId,
     },
   },
 ];
@@ -41,20 +43,6 @@ const mockActivities: NormalizedActivity[] = [
     timestamp: Math.floor(Date.now() / 1000) - 1200,
   },
   {
-    id: "act_hedera_01",
-    chainKey: "hedera",
-    eventType: "AGENT_SPEND_SETTLED",
-    from: "0.0.456789",
-    to: "0.0.12345",
-    asset: "HBAR",
-    amountFormatted: "0.50 HBAR",
-    amountRaw: "50000000",
-    status: "CONFIRMED",
-    txId: "0.0.456789@1730851200.000",
-    explorerUrl: "https://hashscan.io/testnet/transaction/0.0.456789@1730851200.000",
-    timestamp: Math.floor(Date.now() / 1000) - 600,
-  },
-  {
     id: "act_uniswap_01",
     chainKey: "uniswap",
     eventType: "TREASURY_SWAP",
@@ -71,6 +59,14 @@ const mockActivities: NormalizedActivity[] = [
 ];
 
 const server = http.createServer((req: IncomingMessage, res: ServerResponse) => {
+  void handleRequest(req, res).catch((error) => {
+    console.error("Request failed:", error.message);
+    if (!res.headersSent) res.writeHead(503, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Service unavailable" }));
+  });
+});
+
+async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   const parsed = parse(req.url || "/", true);
   const pathname = parsed.pathname || "/";
 
@@ -78,6 +74,7 @@ const server = http.createServer((req: IncomingMessage, res: ServerResponse) => 
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, PAYMENT-SIGNATURE, x-api-key");
+  res.setHeader("Access-Control-Expose-Headers", "PAYMENT-REQUIRED, PAYMENT-RESPONSE");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -95,7 +92,7 @@ const server = http.createServer((req: IncomingMessage, res: ServerResponse) => 
   // Route 2: Hedera x402 Protected Resource Endpoint
   if (pathname === "/v1/services/market-data-pro/query" && req.method === "POST") {
     const paymentSignature = req.headers["payment-signature"] as string | undefined;
-    const check = handleX402PaymentCheck(acmeServices[0], paymentSignature);
+    const check = await handleX402PaymentCheck(acmeServices[0], paymentSignature);
 
     if (!check.authorized) {
       res.writeHead(check.statusCode, check.headers);
@@ -134,8 +131,13 @@ const server = http.createServer((req: IncomingMessage, res: ServerResponse) => 
   }
 
   // Route 3: Accountant CSV Export
+  if (pathname === "/api/hedera/payments" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(getVerifiedHederaPayments()));
+    return;
+  }
   if (pathname === "/api/export.csv" && req.method === "GET") {
-    const csvData = formatAccountantCsv(mockActivities);
+    const csvData = formatAccountantCsv([...mockActivities, ...hederaActivities()]);
     res.writeHead(200, {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="pulsepay-ledger-${Date.now()}.csv"`,
@@ -151,6 +153,15 @@ const server = http.createServer((req: IncomingMessage, res: ServerResponse) => 
     return;
   }
 
+  if (pathname.startsWith("/receipt/hedera/") && req.method === "GET") {
+    const id = pathname.slice("/receipt/hedera/".length);
+    const payment = hederaActivities().find(p => p.txId === id);
+    if (!payment) { res.writeHead(404); res.end("Verified receipt not found"); return; }
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(`<!doctype html><html lang="en"><meta charset="utf-8"><title>Hedera payment receipt</title><h1>Verified Hedera payment</h1><p>${payment.amountFormatted}</p><p>From ${payment.from} to ${payment.to}</p><p>Transaction ${payment.txId}</p><a href="${payment.explorerUrl}">Verify on HashScan</a></html>`);
+    return;
+  }
+
   // Route 5: Customer Receipt View
   if (pathname.startsWith("/receipt") && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -161,7 +172,15 @@ const server = http.createServer((req: IncomingMessage, res: ServerResponse) => 
   // Route 6: Acme Studio Storefront with Drop-in PulsePay Checkout
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(renderStorefrontHtml());
-});
+}
+
+function hederaAmount(amount: bigint): string { return `${amount / 100000000n}.${(amount % 100000000n).toString().padStart(8, "0")}`; }
+function hederaActivities(): NormalizedActivity[] {
+  return getVerifiedHederaPayments().map(p => ({ id: p.transactionId!, chainKey: "hedera", eventType: "AGENT_SPEND_SETTLED",
+    from: p.payer!, to: p.recipient, asset: "HBAR", amountRaw: p.amount, amountFormatted: `${hederaAmount(BigInt(p.amount))} HBAR`,
+    status: "CONFIRMED", txId: p.transactionId!, explorerUrl: `https://hashscan.io/${p.network === "hedera:mainnet" ? "mainnet" : "testnet"}/transaction/${p.transactionId}`,
+    timestamp: Math.floor(Number(p.consensusTimestamp)) }));
+}
 
 function renderStorefrontHtml() {
   return `<!DOCTYPE html>
@@ -403,8 +422,8 @@ function renderMerchantHtml() {
       </div>
       <div class="card">
         <div style="font-size: 12px; color: #64748b;">Agent API Revenue (Hedera)</div>
-        <div style="font-size: 26px; font-weight: 700;">0.50 HBAR</div>
-        <div style="font-size: 11px; color: #2563eb; margin-top: 4px;">x402 Consensus Settled</div>
+        <div style="font-size: 26px; font-weight: 700;">${hederaAmount(getVerifiedHederaPayments().reduce((sum, p) => sum + BigInt(p.amount), 0n))} HBAR</div>
+        <div style="font-size: 11px; color: #2563eb; margin-top: 4px;">Verified native HBAR receipts</div>
       </div>
     </div>
 
@@ -440,13 +459,7 @@ function renderMerchantHtml() {
             <td style="color: #16a34a;">✓ CONFIRMED</td>
             <td><a href="${WHITECHAIN_SEPOLIA_EXPLORER}" target="_blank" style="color: #2563eb;">Explorer ↗</a></td>
           </tr>
-          <tr>
-            <td><strong style="color: #1e40af;">HEDERA</strong></td>
-            <td>Agent x402 Micropayment</td>
-            <td>0.50 HBAR</td>
-            <td style="color: #16a34a;">✓ CONFIRMED</td>
-            <td><a href="https://hashscan.io/testnet" target="_blank" style="color: #2563eb;">HashScan ↗</a></td>
-          </tr>
+          ${hederaActivities().map(a => `<tr><td>HEDERA</td><td>Agent Payment Settled</td><td>${a.amountFormatted}</td><td>CONFIRMED</td><td><a href="${a.explorerUrl}" target="_blank">HashScan ↗</a> · <a href="/receipt/hedera/${a.txId}">Receipt</a></td></tr>`).join("")}
           <tr>
             <td><strong style="color: #7e22ce;">UNISWAP V4</strong></td>
             <td>Treasury Swap Guarded</td>

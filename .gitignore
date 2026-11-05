@@ -56,6 +56,7 @@ pnpm-debug.log*
 *.tmp
 *.temp
 coverage/
+.pulsepay/
 *.lcov
 .nyc_output/
 
