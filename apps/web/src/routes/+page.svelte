@@ -1,27 +1,28 @@
 <script lang="ts">
   import Card from '$lib/components/Card.svelte';
   import Button from '$lib/components/Button.svelte';
-  import Chip from '$lib/components/Chip.svelte';
   import ChainBadge from '$lib/components/ChainBadge.svelte';
-  import { fade, slide, fly } from 'svelte/transition';
-  import { cubicOut } from 'svelte/easing';
+  import { fade, slide } from 'svelte/transition';
 
-  // State for interactive code block
-  let activeCodeTab = $state<'react' | 'vanilla' | 'x402'>('react');
+  // Interactive code runner state
+  let activeCodeTab = $state<'react' | 'vanilla' | 'x402' | 'hook'>('react');
   let copied = $state(false);
   let isSimulating = $state(false);
   let simulationLogs = $state<string[]>([]);
 
-  // State for Tri-Track Architecture Interactive Explorer
+  // Tri-Track interactive explorer state
   let selectedTrack = $state<'whitechain' | 'hedera' | 'uniswap'>('whitechain');
 
-  // State for Interactive Sandbox
+  // Interactive Sandbox state
   let sandboxAmount = $state('20.00');
   let sandboxToken = $state<'USDT' | 'WETH' | 'USDC'>('WETH');
   let sandboxSimulated = $state(false);
 
+  // Copied install state
+  let copiedInstall = $state(false);
+
   const codeSnippets = {
-    react: `import { createPulsePay } from "@pulsepay/sdk";
+    react: `import { createPulsePay, PulsePayCheckout } from "@pulsepay/sdk";
 
 const pulsepay = createPulsePay({
   merchantId: "merch_acme_studio",
@@ -30,10 +31,11 @@ const pulsepay = createPulsePay({
   uniswap: { v4Hook: "0x00C0...4b2" }
 });
 
+// Render zero-friction universal checkout
 <PulsePayCheckout
   invoiceId="inv_123"
   enablePayWithAnyToken={true}
-  onConfirmed={(receipt) => console.log("Settled onchain:", receipt.txHash)}
+  onConfirmed={(receipt) => console.log("Settled:", receipt.txHash)}
 />`,
     vanilla: `import { PulsePayClient } from "@pulsepay/sdk";
 
@@ -59,15 +61,33 @@ const agent = createAgentClient({
   })
 });
 
-// Autonomous machine-to-machine x402 payment
+// Autonomous machine-to-machine x402 payment on Hedera
 const response = await agent.fetch("https://api.acme.com/v1/market-data-basic");
-// Status 402 intercepted -> policy validated -> signed & settled -> HCS logged`
+// Status 402 intercepted -> policy validated -> signed & settled -> HCS logged`,
+    hook: `// contracts/uniswap-v4/src/TreasuryGuardHook.sol
+contract TreasuryGuardHook is BaseHook {
+    bool public paused;
+    uint256 public maxSwapSize = 10_000 * 1e6; // 10,000 USDC cap
+
+    function beforeSwap(address, PoolKey calldata, IPoolManager.SwapParams calldata params, bytes calldata)
+        external override returns (bytes4, BeforeSwapDelta, uint24) {
+        require(!paused, "TreasuryGuard: paused");
+        require(abs(params.amountSpecified) <= maxSwapSize, "TreasuryGuard: over max");
+        return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+    }
+}`
   };
 
   function copyCode() {
     navigator.clipboard?.writeText(codeSnippets[activeCodeTab]);
     copied = true;
     setTimeout(() => { copied = false; }, 2000);
+  }
+
+  function copyInstall() {
+    navigator.clipboard?.writeText('npm install @pulsepay/sdk viem');
+    copiedInstall = true;
+    setTimeout(() => { copiedInstall = false; }, 2000);
   }
 
   function runSimulation() {
@@ -93,50 +113,106 @@ const response = await agent.fetch("https://api.acme.com/v1/market-data-basic");
 </script>
 
 <svelte:head>
-  <title>PulsePay — Unified Onchain Payment Stack for B2B & AI Agents</title>
+  <title>PulsePay — Unified Onchain Payment & Treasury Stack</title>
 </svelte:head>
 
-<!-- SECTION 1: HERO & WIREFRAME 01-LANDING COMPONENT -->
-<section id="hero" class="mt-4 mb-20">
-  <!-- PAGE HEADING -->
-  <div class="mb-10 max-w-4xl">
-    <div class="inline-flex items-center gap-2 px-3 py-1 border-2 border-[#2B2170] rounded-full text-xs font-semibold text-[#2B2170] bg-white mb-4 shadow-2xs">
-      <span class="w-2 h-2 rounded-full bg-[#C8C3F2] border border-[#2B2170]"></span>
-      <span>Enterprise SDK Specification · Whitechain 1874 · Hedera · Uniswap v4</span>
-    </div>
-    <h1 class="font-serif text-4xl sm:text-5xl lg:text-6xl font-normal text-[#2B2170] tracking-tight mb-3 leading-tight">
-      One SDK for getting paid.
-    </h1>
-    <p class="font-serif italic text-lg sm:text-xl text-[#645C9A] font-normal leading-relaxed">
-      By people, by agents, in any token. Settled onchain, verified by anyone.
-    </p>
+<!-- ========================================================================= -->
+<!-- 1. AWWWARDS-STYLE CENTERED HERO WITH ICONIC LOGO & ANIMATIONS             -->
+<!-- ========================================================================= -->
+<section class="relative pt-6 pb-20 overflow-hidden text-center">
+  <!-- Subtle ambient background grid -->
+  <div class="absolute inset-0 bg-grid-subtle pointer-events-none opacity-60 -z-10"></div>
 
-    <!-- Jump navigation pills for quick smooth scroll -->
-    <div class="flex flex-wrap items-center gap-2 pt-4">
-      <a href="#architecture" class="text-xs font-semibold px-3 py-1 border border-[#2B2170] rounded-full text-[#2B2170] hover:bg-[#C8C3F2] transition-colors">
-        Tri-Track Architecture &darr;
-      </a>
-      <a href="#lifecycle" class="text-xs font-semibold px-3 py-1 border border-[#2B2170] rounded-full text-[#2B2170] hover:bg-[#C8C3F2] transition-colors">
-        Acme Studio Journey &darr;
-      </a>
-      <a href="#sandbox" class="text-xs font-semibold px-3 py-1 border border-[#2B2170] rounded-full text-[#2B2170] hover:bg-[#C8C3F2] transition-colors">
-        Interactive Sandbox &darr;
-      </a>
-      <a href="#comparison" class="text-xs font-semibold px-3 py-1 border border-[#2B2170] rounded-full text-[#2B2170] hover:bg-[#C8C3F2] transition-colors">
-        Enterprise Comparison &darr;
-      </a>
+  <!-- CENTERED BRAND EMBLEM & HALO ANIMATION -->
+  <div class="flex flex-col items-center justify-center mb-8 relative">
+    <!-- Pulsing ambient halo behind logo -->
+    <div class="absolute w-36 h-36 rounded-full bg-[#C8C3F2]/40 filter blur-xl animate-halo pointer-events-none -z-10"></div>
+
+    <!-- Centered interlocking insignia with subtle gentle float -->
+    <div class="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center animate-float select-none">
+      <!-- Concentric animated outline rings -->
+      <div class="absolute inset-0 rounded-full border-2 border-dashed border-[#2B2170]/30 animate-spin [animation-duration:35s]"></div>
+      <div class="absolute inset-2 rounded-full border-2 border-[#2B2170] bg-white shadow-md flex items-center justify-center">
+        <!-- Three intersecting purple badges -->
+        <div class="flex items-center -space-x-2">
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-[#2B2170] bg-[#C8C3F2] flex items-center justify-center text-[10px] font-bold text-[#2B2170] shadow-2xs">
+            WC
+          </div>
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-[#2B2170] bg-[#D6D2F7] flex items-center justify-center text-[10px] font-bold text-[#2B2170] shadow-2xs">
+            HB
+          </div>
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-[#2B2170] bg-[#B4ADEB] flex items-center justify-center text-[10px] font-bold text-[#2B2170] shadow-2xs">
+            UNI
+          </div>
+        </div>
+      </div>
+      <!-- Center pulsing indicator -->
+      <div class="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-[#2B2170] bg-[#C8C3F2] animate-ping"></div>
+      <div class="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-[#2B2170] bg-[#2B2170]"></div>
+    </div>
+
+    <!-- Brand Category Pill -->
+    <div class="mt-6 inline-flex items-center gap-2 px-4 py-1 border-2 border-[#2B2170] rounded-full text-xs font-bold tracking-wider uppercase text-[#2B2170] bg-white shadow-2xs">
+      <span class="w-2 h-2 rounded-full bg-[#C8C3F2] border border-[#2B2170]"></span>
+      <span>PulsePay SDK v1.2 · B2B Financial Infrastructure</span>
     </div>
   </div>
 
-  <!-- MAIN 2-COLUMN GRID (Matching Wireframe 01-landing.png) -->
+  <!-- CENTERED HERO HEADLINE -->
+  <h1 class="font-serif text-5xl sm:text-6xl lg:text-7xl font-normal text-[#2B2170] tracking-tight max-w-4xl mx-auto leading-[1.08] mb-4">
+    One SDK for getting paid.
+  </h1>
+
+  <!-- CENTERED SUBTITLE -->
+  <p class="font-serif italic text-lg sm:text-2xl text-[#645C9A] font-normal max-w-2xl mx-auto leading-relaxed mb-8">
+    By people, by agents, in any token. Settled onchain, verified by anyone.
+  </p>
+
+  <!-- CENTERED ACTION CLUSTER -->
+  <div class="flex flex-wrap items-center justify-center gap-3 mb-10">
+    <Button variant="primary" size="lg" href="/checkout" class="shadow-sm">
+      Launch Universal Checkout &rarr;
+    </Button>
+    <Button variant="outline" size="lg" href="/merchant">
+      Open Merchant Console
+    </Button>
+    <button
+      type="button"
+      onclick={copyInstall}
+      class="inline-flex items-center gap-2 px-5 py-3 border-2 border-[#2B2170] rounded-full text-sm font-mono font-semibold bg-white text-[#2B2170] hover:bg-black/5 transition-colors cursor-pointer select-none"
+      title="Click to copy install command"
+    >
+      <span>npm i @pulsepay/sdk</span>
+      <span class="text-xs px-2 py-0.5 rounded-full bg-[#C8C3F2] font-sans font-bold">
+        {copiedInstall ? '✓' : 'Copy'}
+      </span>
+    </button>
+  </div>
+
+  <!-- STATS TICKER -->
+  <div class="inline-flex flex-wrap items-center justify-center gap-4 sm:gap-8 px-6 py-2.5 border-2 border-[#2B2170] rounded-full bg-white text-xs font-bold text-[#2B2170] shadow-xs">
+    <span>3 Settlement Rails</span>
+    <span class="text-[#E2DEF3]">|</span>
+    <span>$0.002 Avg Settlement Fee</span>
+    <span class="text-[#E2DEF3]">|</span>
+    <span>100% Non-Custodial</span>
+    <span class="text-[#E2DEF3]">|</span>
+    <span>Sub-second Finality</span>
+  </div>
+</section>
+
+<!-- ========================================================================= -->
+<!-- 2. CORE WIREFRAME 01 CONTENT (CARD + 3 FEATURE RAILS)                     -->
+<!-- ========================================================================= -->
+<section id="terminal-section" class="mb-20">
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
     <!-- LEFT CARD: CODE SNIPPET (~20 LINES) -->
     <div class="lg:col-span-6">
-      <Card tabText="~20 LINES" tabColor="purple" class="flex flex-col justify-between min-h-[500px]">
+      <Card tabText="~20 LINES" tabColor="purple" class="flex flex-col justify-between min-h-[520px]">
         <div>
           <!-- Tab Selector & Copy Header -->
           <div class="flex items-center justify-between pb-3 mb-4 border-b border-[#E2DEF3]">
-            <div class="flex items-center gap-1 sm:gap-2 text-xs font-semibold">
+            <div class="flex flex-wrap items-center gap-1 sm:gap-2 text-xs font-semibold">
               <button
                 type="button"
                 onclick={() => activeCodeTab = 'react'}
@@ -158,11 +234,18 @@ const response = await agent.fetch("https://api.acme.com/v1/market-data-basic");
               >
                 x402 Agent Client
               </button>
+              <button
+                type="button"
+                onclick={() => activeCodeTab = 'hook'}
+                class="px-2.5 py-1 rounded-md transition-colors cursor-pointer {activeCodeTab === 'hook' ? 'bg-[#2B2170] text-white' : 'text-[#645C9A] hover:text-[#2B2170]'}"
+              >
+                v4 Hook
+              </button>
             </div>
             <button
               type="button"
               onclick={copyCode}
-              class="text-xs font-semibold text-[#645C9A] hover:text-[#2B2170] flex items-center gap-1 cursor-pointer"
+              class="text-xs font-semibold text-[#645C9A] hover:text-[#2B2170] flex items-center gap-1 cursor-pointer shrink-0"
             >
               <span>{copied ? '✓ Copied' : 'Copy'}</span>
             </button>
@@ -203,7 +286,7 @@ const response = await agent.fetch("https://api.acme.com/v1/market-data-basic");
             type="button"
             onclick={runSimulation}
             disabled={isSimulating}
-            class="px-3.5 py-1.5 border border-[#2B2170] rounded-full text-xs font-bold bg-[#C8C3F2] hover:bg-[#b8b3ea] text-[#2B2170] transition-colors cursor-pointer"
+            class="px-3.5 py-1.5 border-2 border-[#2B2170] rounded-full text-xs font-bold bg-[#C8C3F2] hover:bg-[#b8b3ea] text-[#2B2170] transition-colors cursor-pointer shadow-2xs"
           >
             {isSimulating ? 'Executing...' : '▶ Simulate SDK'}
           </button>
@@ -278,7 +361,9 @@ const response = await agent.fetch("https://api.acme.com/v1/market-data-basic");
   </div>
 </section>
 
-<!-- SECTION 2: TRI-TRACK ARCHITECTURAL SPECIFICATION (FROM PRD SECTION 1 & 2) -->
+<!-- ========================================================================= -->
+<!-- 3. TRI-TRACK SYSTEM ARCHITECTURE SPECIFICATION                            -->
+<!-- ========================================================================= -->
 <section id="architecture" class="mb-20 pt-8 border-t border-[#E2DEF3]">
   <div class="mb-8">
     <div class="text-xs font-bold uppercase tracking-wider text-[#645C9A] mb-1">
@@ -437,7 +522,9 @@ const response = await agent.fetch("https://api.acme.com/v1/market-data-basic");
   </Card>
 </section>
 
-<!-- SECTION 3: CORE ACME STUDIO USER JOURNEY (FROM PRD SECTION 1.3 & 6) -->
+<!-- ========================================================================= -->
+<!-- 4. ACME STUDIO B2B USER JOURNEY ROADMAP                                   -->
+<!-- ========================================================================= -->
 <section id="lifecycle" class="mb-20 pt-8 border-t border-[#E2DEF3]">
   <div class="mb-8">
     <div class="text-xs font-bold uppercase tracking-wider text-[#645C9A] mb-1">
@@ -534,7 +621,9 @@ const response = await agent.fetch("https://api.acme.com/v1/market-data-basic");
   </div>
 </section>
 
-<!-- SECTION 4: INTERACTIVE SDK SANDBOX -->
+<!-- ========================================================================= -->
+<!-- 5. INTERACTIVE LIVE INVOICE & TOKEN ROUTER SANDBOX                        -->
+<!-- ========================================================================= -->
 <section id="sandbox" class="mb-20 pt-8 border-t border-[#E2DEF3]">
   <div class="mb-8">
     <div class="text-xs font-bold uppercase tracking-wider text-[#645C9A] mb-1">
@@ -632,7 +721,9 @@ const response = await agent.fetch("https://api.acme.com/v1/market-data-basic");
   </Card>
 </section>
 
-<!-- SECTION 5: ENTERPRISE COMPARISON TABLE (PRD SECTION 3) -->
+<!-- ========================================================================= -->
+<!-- 6. MARKET BENCHMARK & COMPARISON TABLE (PRD SECTION 3)                   -->
+<!-- ========================================================================= -->
 <section id="comparison" class="mb-20 pt-8 border-t border-[#E2DEF3]">
   <div class="mb-8">
     <div class="text-xs font-bold uppercase tracking-wider text-[#645C9A] mb-1">
@@ -694,25 +785,33 @@ const response = await agent.fetch("https://api.acme.com/v1/market-data-basic");
   </Card>
 </section>
 
-<!-- SECTION 6: GETTING STARTED & QUICK LINKS -->
+<!-- ========================================================================= -->
+<!-- 7. GETTING STARTED & APPLICATION NAVIGATION HUB                           -->
+<!-- ========================================================================= -->
 <section id="get-started" class="mb-16 pt-8 border-t border-[#E2DEF3]">
-  <Card tabText="INTEGRATION" tabColor="purple" class="p-8 text-center bg-white">
+  <Card tabText="INTEGRATION HUB" tabColor="purple" class="p-8 text-center bg-white">
     <h2 class="font-serif text-3xl sm:text-4xl font-normal text-[#2B2170] mb-2">
       Ready to deploy PulsePay?
     </h2>
     <p class="font-serif italic text-base text-[#645C9A] max-w-xl mx-auto mb-6">
-      Drop the SDK into your Next.js, SvelteKit, React or Node.js backend in under 20 lines of code.
+      Explore each live sub-system across human billing, autonomous agents, and treasury management.
     </p>
 
     <div class="flex flex-wrap items-center justify-center gap-3">
       <Button variant="primary" size="lg" href="/checkout">
-        Launch Customer Checkout
+        Universal Checkout
       </Button>
       <Button variant="outline" size="lg" href="/merchant">
-        Access Merchant Dashboard
+        Merchant Invoices
+      </Button>
+      <Button variant="outline" size="lg" href="/merchant/subscriptions">
+        Subscriptions
       </Button>
       <Button variant="secondary" size="lg" href="/agents">
-        Test AI Agent Micropayments
+        Agent Payments (x402)
+      </Button>
+      <Button variant="outline" size="lg" href="/treasury">
+        Treasury & Ledger
       </Button>
     </div>
   </Card>

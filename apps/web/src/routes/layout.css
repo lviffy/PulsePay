@@ -70,3 +70,38 @@ body {
   line-height: 1.25;
   z-index: 10;
 }
+
+/* Architectural grid pattern for hero backdrop */
+.bg-grid-subtle {
+  background-image: radial-gradient(rgba(43, 33, 112, 0.06) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+}
+
+/* Animation utilities */
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulseHalo {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.25;
+  }
+}
+
+.animate-float {
+  animation: floatGentle 5s ease-in-out infinite;
+}
+
+.animate-halo {
+  animation: pulseHalo 4s ease-in-out infinite;
+}
