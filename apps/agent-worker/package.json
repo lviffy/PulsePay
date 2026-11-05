@@ -1,0 +1,22 @@
+{
+  "name": "pulsepay-agent-worker",
+  "version": "1.0.0",
+  "description": "Autonomous buyer agent that discovers services, enforces spend policies, and pays via x402 on Hedera",
+  "main": "./dist/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "run:agent": "node dist/index.js"
+  },
+  "dependencies": {
+    "@pulsepay/shared": "workspace:*",
+    "@pulsepay/adapter-hedera": "workspace:*",
+    "@hashgraph/sdk": "^2.58.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.3"
+  }
+}
+

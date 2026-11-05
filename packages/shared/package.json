@@ -1,0 +1,19 @@
+{
+  "name": "@pulsepay/shared",
+  "version": "1.0.0",
+  "description": "Shared schemas, types, and constants for PulsePay",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
+

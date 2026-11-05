@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.pnpm-task-run-state-*
+.pnpm-workspace-state-*
+.npm/
+
+# Agent Skills & AI Assistant Configuration
+.agents
+.agents/
+.agents/**
+agent/
+agent/**
+.claude
+.claude/
+.claude/**
+skills-lock.json
+.gemini/
+.antigravity/
+.cursor/
+.windsurf/
+
+# Local binaries & caches
+.bin/
+.turbo/
+dist/
+out/
+build/
+cache/
+.cache/
+*.tsbuildinfo
+
+# Foundry
+contracts/**/out/
+contracts/**/cache/
+contracts/**/broadcast/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+keystore/
+*.secret
+
+# Next.js & Frontend builds
+.next/
+
+# Logs & Temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tmp
+*.temp
+coverage/
+*.lcov
+.nyc_output/
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

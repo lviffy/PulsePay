@@ -1,0 +1,33 @@
+{
+  "name": "pulsepay-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PulsePay: The unified onchain payment & treasury stack for businesses, human customers, and AI agents",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "contracts:whitechain:build": "cd contracts/whitechain && ../../.bin/forge build",
+    "contracts:whitechain:test": "cd contracts/whitechain && ../../.bin/forge test",
+    "contracts:uniswap:build": "cd contracts/uniswap-v4 && ../../.bin/forge build",
+    "contracts:uniswap:test": "cd contracts/uniswap-v4 && ../../.bin/forge test"
+  },
+  "keywords": [
+    "pulsepay",
+    "whitechain",
+    "uniswap",
+    "hedera",
+    "x402",
+    "agentic-payments",
+    "subscriptions"
+  ],
+  "author": "PulsePay Team",
+  "license": "MIT",
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.3"
+  },
+  "packageManager": "pnpm@12.14.0"
+}
+

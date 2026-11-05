@@ -581,27 +581,34 @@ export default function MerchantPage() {
 
 ### 8.4 Server integration for x402
 
-The server integration should wrap a real x402-compatible resource server and facilitator integration. Do not hand-roll a fake payment proof or hardcode a successful transaction response.
+The server integration wraps `@x402/core` with `@x402/hedera/exact/server` (`ExactHederaScheme`) and the Hedera facilitator. Do not hand-roll a fake payment proof or hardcode a successful transaction response.
 
 Target usage:
 
 ```ts
-import { pulsePayX402 } from "@pulsepay/server";
+import { HTTPFacilitatorClient, x402ResourceServer } from "@x402/core/server";
+import { ExactHederaScheme } from "@x402/hedera/exact/server";
 
-export const POST = pulsePayX402({
-  serviceId: "market-data-basic",
-  price: {
-    network: "hedera:testnet",
-    asset: process.env.HEDERA_USDC_TOKEN_ID!,
-    amount: "20000",
-  },
-  facilitatorUrl: process.env.HEDERA_X402_FACILITATOR!,
-})(async (request) => {
-  return Response.json(await getMarketData(request));
+const facilitator = new HTTPFacilitatorClient({
+  url: process.env.HEDERA_X402_FACILITATOR_URL ?? "http://localhost:4020",
 });
+
+const server = new x402ResourceServer(facilitator).register(
+  (process.env.HEDERA_NETWORK_X402 ?? "hedera:testnet") as any,
+  new ExactHederaScheme(),
+);
+await server.initialize(); // Retrieves fee-payer account from facilitator /supported
+
+// Service pricing uses native HBAR (asset "0.0.0") denominated strictly in tinybars (1 HBAR = 100,000,000 tinybars)
+export const MARKET_DATA_SERVICE_REQUIREMENTS = {
+  payTo: process.env.HEDERA_MERCHANT_ACCOUNT_ID!, // e.g. "0.0.1234"
+  amount: "50000000",                             // 0.5 HBAR in tinybars
+  asset: "0.0.0",                                 // Native HBAR
+  network: "hedera:testnet",
+};
 ```
 
-The exact API must follow the x402 SDK/facilitator version used in the repository. `amount` is expressed in the token's smallest unit; the implementation must read or configure token decimals instead of assuming them.
+The resource server never stores facilitator private keys; settlement uses an isolated, funded ECDSA fee-payer account on the facilitator. `amount` is expressed in integer tinybars without floating-point conversion errors.
 
 ---
 
@@ -619,7 +626,7 @@ Whitechain owns the merchant billing lifecycle: invoices, stablecoin checkout, s
 | ------------- | -------------------------------------------- |
 | Network       | Whitechain Sepolia                           |
 | Chain ID      | `1874`                                       |
-| RPC           | `https://rpc.testnet.whitechain.io`          |
+| RPC           | `https://rpc.testnet.whitechain.io` (or Ankr: `https://www.ankr.com/rpc/?utm_referral=Whitechain2026`) |
 | Explorer      | `https://explorer.testnet.whitechain.io/`    |
 | Faucet        | `https://faucet.testnet.whitechain.io/`      |
 | Required USDT | `0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7` |
@@ -760,25 +767,25 @@ This gives the judge a real, testable reserve-backed refund flow without pretend
 
 ---
 
-## 9.2 Hedera — AI Agents That Pay: x402 on Hedera
+## 9.2 Hedera — AI Agents That Pay: x402 on Hedera & Hedera Agent Kit v4
 
 ### Purpose
 
-Hedera owns machine-to-machine monetization and policy-controlled agent spending.
+Hedera owns machine-to-machine monetization, autonomous policy-controlled agent spending, and immutable consensus audit logging. The entire Hedera integration uses **100% native Hedera services and SDKs (zero Solidity on Hedera)**, qualifying directly for the *"No Solidity Allowed"* bonus track while providing enterprise-grade agent guardrails.
 
 ### Architecture
 
-Three roles participate:
+Three primary roles participate:
 
-1. **Resource server / merchant:** Owns the paid API or MCP tool and returns x402 requirements for unpaid requests.
-2. **Buyer agent / client:** Discovers the service, checks policy, signs the payment payload and retries.
-3. **Facilitator:** Verifies the payment payload and settles the payment on Hedera. In the Hedera x402 flow, the facilitator can pay the network fee so the buyer does not need HBAR just to submit the payment.
+1. **Resource server / merchant:** Exposes paid APIs or services protected by `@x402/core` + `@x402/hedera/exact/server` (`ExactHederaScheme`). Unpaid requests receive standard HTTP `402 Payment Required` challenges.
+2. **Buyer agent / client:** An autonomous agent powered by `@hashgraph/hedera-agent-kit` (v4) and `@hashgraph/hedera-agent-kit-langchain`. Equipped with `PulsePayHederaPlugin` (`x402_pay_tool`, `discover_services_tool`, `issue_refund_tool`) with deterministic spend guardrails via `PulsePaySpendLimitPolicy` (`AbstractPolicy`).
+3. **Hedera Facilitator:** Separate HTTP service (`GET /health`, `GET /supported`, `POST /verify`, `POST /settle`). Verifies partially signed client transfers, sponsors transaction submission fees using an isolated ECDSA fee-payer account (`FACILITATOR_ACCOUNT_ID` + `FACILITATOR_PRIVATE_KEY`), and returns consensus settlement receipts.
 
-Use a facilitator listed in the current Hedera x402 documentation (Official x402, Ax402 or Blocky402), or run a facilitator yourself only if required and time permits.
+> **Security Boundary:** The resource server never holds facilitator private keys. The agent client only signs transfers up to the service quote; network fees are co-signed and submitted by the facilitator.
 
 ### Discovery design
 
-PulsePay adds a service directory and a service manifest. The directory is the discovery/indexing layer; x402 is the payment protocol. Do not claim that x402 itself is an agent-search engine.
+PulsePay adds a service directory and a machine-readable service manifest. The directory is the discovery layer; x402 is the payment protocol.
 
 Proposed endpoints:
 
@@ -790,137 +797,175 @@ Proposed endpoints:
 | `POST /v1/services/:serviceId/*`    | Protected service route; returns x402 402 response when unpaid |
 | `GET /v1/agent/receipts/:paymentId` | Read payment, refund and HCS audit references                  |
 
-Manifest example (application-level shape; align fields with the selected x402 SDK version):
+Manifest example:
 
 ```json
 {
   "name": "Acme Market Data",
-  "description": "Pay-per-request market-data API",
+  "description": "Pay-per-request market-data API for AI agents",
   "version": "1.0.0",
   "serviceId": "market-data-basic",
   "protocol": "x402",
   "network": "hedera:testnet",
-  "asset": "0.0.429274",
-  "price": "20000",
+  "asset": "0.0.0",
+  "price": "50000000",
   "unit": "request",
-  "endpoint": "https://api.example.com/v1/market-data",
+  "endpoint": "https://api.example.com/v1/services/market-data-basic/query",
   "agentIdentity": "uaid:aid:...",
   "auditTopicId": "0.0.123456"
 }
 ```
 
-The example HTS token ID is illustrative of a Hedera testnet USDC setup used in public examples. At runtime, use the token ID and network actually supported by the chosen facilitator, and read token decimals from the correct source. Do not assume all test environments share the same token ID.
+> **Pricing Convention:** In Hedera x402 `ExactHederaScheme`, `asset: "0.0.0"` represents native HBAR. `price` is strictly denominated in **tinybars** as a stringified integer (`1 HBAR = 100,000,000 tinybars`; `50,000,000` = 0.5 HBAR). Floating-point amounts are prohibited to prevent rounding discrepancies.
 
-### x402 request/settlement flow
+### x402 Request and Settlement Flow
 
-Use the standard x402 version and headers supported by the chosen Hedera SDK/facilitator. Current x402 conventions include:
+1. **Unpaid probe:** Buyer calls protected endpoint `POST /v1/services/:id/query`.
+2. **HTTP 402 challenge:** Resource server returns HTTP 402 with `PAYMENT-REQUIRED` header containing `payTo` (Hedera AccountId string, e.g. `0.0.1234`), `amount` (in tinybars), `asset` (`0.0.0`), and `network` (`hedera:testnet`).
+3. **Policy verification:** The agent's `PulsePaySpendLimitPolicy` intercepts the payload. If the price exceeds the per-call cap, exceeds remaining daily budget, or the merchant account is not allowlisted, the policy throws deterministically before signing.
+4. **Signature creation:** If approved, the agent signs an HBAR debit transaction payload using its ECDSA key via `x402HTTPClient`.
+5. **Authenticated retry:** The agent retries the request with `PAYMENT-SIGNATURE` header.
+6. **Facilitator settlement:** Resource server submits payload to facilitator `/verify` and `/settle`. The facilitator co-signs as network fee payer and submits to Hedera consensus.
+7. **Resource response:** Upon verified onchain settlement, resource server returns the protected API payload with `PAYMENT-RESPONSE` header containing the Hedera transaction ID.
+8. **HCS audit hook:** The agent's `PulsePayHcsAuditHook` fires at Stage 7 of `BaseTool`, submitting a structured consensus audit log to the merchant's HCS topic.
 
-- `PAYMENT-REQUIRED` — resource server describes payment requirements.
-- `PAYMENT-SIGNATURE` — client sends the payment payload.
-- `PAYMENT-RESPONSE` — resource server returns settlement information.
+### Hedera Agent Kit v4 Plugin & Tool Architecture
 
-The implementation should use the selected x402 client/server packages and the exact Hedera scheme specification. Avoid custom headers or fabricated payment-proof strings.
+Tools are encapsulated in a custom plugin `PulsePayHederaPlugin` extending `BaseTool` from `@hashgraph/hedera-agent-kit`:
 
-### Buyer agent responsibilities
+```typescript
+import { BaseTool, Context } from '@hashgraph/hedera-agent-kit';
+import { z } from 'zod';
 
-Before paying, the agent must check:
+export class X402PayTool extends BaseTool {
+  method = 'x402_pay_tool';
+  name = 'x402 Pay';
+  description = 'Autonomously discovers HTTP 402 requirements, validates budget, signs HBAR payment, and consumes paid API';
 
-- Network and asset match the allowed configuration.
-- Recipient matches the service's quoted `payTo`.
-- Amount does not exceed per-request limit.
-- Merchant/service is allowlisted or otherwise approved by policy.
-- Daily budget has enough remaining balance.
-- Quote is not expired.
-- Payment has not already been attempted/settled for the same request ID.
+  parameters = z.object({
+    serviceUrl: z.string().url().describe('Protected service endpoint URL'),
+    payload: z.record(z.any()).optional().describe('Query payload'),
+    maxBudgetTinybars: z.string().optional().describe('Maximum budget in tinybars for this call'),
+  });
 
-If all checks pass, the agent signs the x402 payment payload and retries the request. For the hackathon demonstration, the agent should complete the interaction without any human click after it has been started.
+  async normalizeParams(params: any, context: Context, client: any) {
+    // Normalization & parameter resolution (Stage 2)
+    return { ...params, maxBudgetTinybars: BigInt(params.maxBudgetTinybars ?? '100000000') };
+  }
 
-### Spending policy engine
+  async coreAction(normalised: any, context: Context, client: any) {
+    // Probe service, parse 402 challenge, build payment transaction (Stage 4)
+    return await executeX402PaymentProbe(normalised);
+  }
 
-```ts
-type AgentSpendPolicy = {
-  dailyBudgetUnits: bigint;
-  maxPerRequestUnits: bigint;
-  maxPerMerchantPerDayUnits: bigint;
-  allowedMerchantIds: string[];
-  allowedNetworks: string[];
-  allowedAssets: string[];
-  humanApprovalAboveUnits?: bigint;
-  enabled: boolean;
-};
+  async secondaryAction(request: any, client: any, context: Context) {
+    // Submit signed payload to facilitator, verify settlement, return unboxed data (Stage 6)
+    return await executeX402Settlement(request, client);
+  }
+}
 ```
 
-Policy enforcement should be deterministic code. An LLM may discover or compare services, but it must not be trusted to enforce the spend ceiling.
+### Spending Policy Engine (`AbstractPolicy`)
 
-### HCS audit log
+Deterministic spend guardrails are enforced by extending `AbstractPolicy` from `@hashgraph/hedera-agent-kit`:
 
-Create or use a merchant-controlled HCS topic to record events such as:
+```typescript
+import { AbstractPolicy, PostParamsNormalizationParams } from '@hashgraph/hedera-agent-kit';
 
-- `AGENT_SERVICE_DISCOVERED`
-- `AGENT_SPEND_REQUESTED`
-- `AGENT_SPEND_REJECTED`
-- `AGENT_PAYMENT_SETTLED`
-- `AGENT_SERVICE_FULFILLED`
-- `AGENT_REFUND_SETTLED`
-- `AGENT_BUDGET_UPDATED`
+export class PulsePaySpendLimitPolicy extends AbstractPolicy {
+  name = 'PulsePaySpendLimitPolicy';
+  description = 'Blocks agent payments exceeding tinybar caps or daily budgets';
+  relevantTools = ['x402_pay_tool', 'transfer_hbar'];
 
-Each settled record should include:
+  private spentTodayTinybars: bigint = 0n;
 
-- Internal payment/order ID.
-- Agent ID / payer account ID.
-- Merchant/service ID.
-- Network and asset.
-- Amount in smallest units and formatted display amount.
-- Hedera transaction ID.
-- Timestamp.
-- Related original transaction ID for a refund.
+  constructor(
+    private maxPerRequestTinybars: bigint,
+    private dailyBudgetTinybars: bigint,
+    private allowedMerchantAccountIds: string[],
+  ) {
+    super();
+  }
 
-Do not put private keys, access tokens, personal customer data or confidential request payloads in HCS messages. HCS is an append-only, independently queryable audit surface; the application DB remains the query/indexing convenience layer.
+  protected shouldBlockPostParamsNormalization(
+    params: PostParamsNormalizationParams,
+    method: string,
+  ): boolean {
+    if (!this.relevantTools.includes(method)) return false;
+    const p = params.normalisedParams as { maxBudgetTinybars?: bigint; merchantAccountId?: string };
+    const cost = p.maxBudgetTinybars ?? 0n;
 
-### Agent identity and reputation
+    if (cost > this.maxPerRequestTinybars) {
+      throw new Error(`[PulsePay Policy] Cost ${cost} tinybars exceeds per-call cap of ${this.maxPerRequestTinybars} tinybars`);
+    }
+    if (this.spentTodayTinybars + cost > this.dailyBudgetTinybars) {
+      throw new Error(`[PulsePay Policy] Cost ${cost} tinybars exceeds daily budget`);
+    }
+    this.spentTodayTinybars += cost;
+    return false;
+  }
+}
+```
 
-For extra credit, add an HCS-14 Universal Agent Identifier (UAID) to the service manifest or agent profile.
+### HCS Consensus Audit Hook (`AbstractHook`)
 
-- Generate the identifier from a canonical agent profile using the HCS-14 tooling.
-- Include the agent's name, version, protocol, native ID and supported skills.
-- Resolve the identifier in the demo or README.
-- Treat HCS-14 as version-sensitive and verify the current specification/package before committing to the integration; the standard has been described as draft in the underlying specification.
+Non-blocking consensus audit logs are submitted automatically via `PulsePayHcsAuditHook` extending `AbstractHook` (or using built-in `HcsAuditTrailHook` from `@hashgraph/hedera-agent-kit/hooks`):
 
-Do not make the whole MVP depend on agent reputation scoring. A made-up reputation score is worse than no score.
+```typescript
+import { AbstractHook, PostSecondaryActionParams } from '@hashgraph/hedera-agent-kit';
+import { TopicMessageSubmitTransaction, TopicId } from '@hiero-ledger/sdk';
 
-### Hedera refund handling
+export class PulsePayHcsAuditHook extends AbstractHook {
+  name = 'PulsePayHcsAuditHook';
+  relevantTools = ['x402_pay_tool', 'issue_refund_tool'];
 
-x402 does not reverse an earlier payment. A refund is a new transfer.
+  constructor(private auditTopicId: string) {
+    super();
+  }
 
-For a refund:
+  async postToolExecutionHook(params: PostSecondaryActionParams, method: string) {
+    if (!this.relevantTools.includes(method)) return;
+    const res = params.toolResult as any;
+    if (!res?.txId) return;
 
-1. Read the original settlement and payer identity.
-2. Check the merchant's available HTS balance and token association.
-3. Transfer the refund amount from merchant to original agent/customer.
-4. Verify settlement.
-5. Write the refund event and original transaction reference to HCS.
-6. Expose a receipt page with both transaction links.
+    const message = {
+      schemaVersion: '1.0.0',
+      eventType: method === 'x402_pay_tool' ? 'AGENT_PAYMENT_SETTLED' : 'AGENT_REFUND_SETTLED',
+      txId: res.txId,
+      amountTinybars: res.amountTinybars,
+      merchantAccountId: res.merchantAccountId,
+      timestamp: Date.now(),
+    };
 
-### Scheduled Transactions caution
+    new TopicMessageSubmitTransaction()
+      .setTopicId(TopicId.fromString(this.auditTopicId))
+      .setMessage(JSON.stringify(message))
+      .execute(params.client)
+      .catch((err) => console.error('[HCS Hook Error]', err));
+  }
+}
+```
 
-The Hedera track lists recurring or subscription-style payments through Scheduled Transactions as an extra-credit idea. A Hedera Scheduled Transaction is not a recurring cron service: it schedules one specific transaction and depends on required signatures/expiry behavior. It does not automatically repeat every month.
+### Hedera Refund Handling
 
-PulsePay's primary recurring subscription engine therefore lives on Whitechain. If time permits, add a narrowly scoped Hedera scheduled one-off payment or a set of pre-authorized scheduled payments, and describe the actual signature/expiry limitations accurately.
+x402 is non-reversible; refunds are executed as native HBAR transfers (`TransferTransaction` in `@hiero-ledger/sdk`) from the merchant back to the buyer account:
 
-### Hedera acceptance checklist
+1. Merchant selects original payment in PulsePay dashboard.
+2. `issue_refund_tool` verifies original settlement txId and merchant HBAR balance.
+3. Submits native `TransferTransaction` credit buyer, debit merchant.
+4. Fires `PulsePayHcsAuditHook` with event `AGENT_REFUND_SETTLED` linking `originalTxId` and `refundTxId`.
+5. Public receipt page displays both HashScan transaction links and consensus timestamps.
 
-- [ ] At least one x402-protected endpoint is live on Hedera testnet/mainnet.
-- [ ] A buyer agent discovers the endpoint.
-- [ ] Buyer agent autonomously completes at least one paid request without a human approving the payment.
-- [ ] Payment uses HBAR or an HTS token accepted by the facilitator; prefer testnet USDC if available.
-- [ ] Facilitator verification and settlement both succeed.
-- [ ] Real Hedera transaction ID is stored.
-- [ ] HashScan transaction link is in README and visible in demo.
-- [ ] Agent spend cap and daily budget are enforced.
-- [ ] A merchant/domain allowlist or human-approval threshold is demonstrated.
-- [ ] HCS topic contains a verifiable spending audit entry.
-- [ ] Public GitHub README documents setup, architecture and payment flow.
-- [ ] Demo video is five minutes or less.
+### Hedera Acceptance Checklist
+
+- [ ] At least one x402-protected endpoint is live on Hedera testnet using `@x402/core` + `@x402/hedera/exact/server`.
+- [ ] Payment uses native HBAR (`asset: "0.0.0"`) denominated in integer tinybars.
+- [ ] Facilitator verifies ECDSA client signature, co-signs network fees, and settles on Hedera testnet.
+- [ ] Buyer agent autonomously completes discovery, payment, and unboxing without human intervention.
+- [ ] Deterministic `PulsePaySpendLimitPolicy` blocks payments above per-request cap or daily budget.
+- [ ] `PulsePayHcsAuditHook` submits immutable audit message to merchant HCS topic.
+- [ ] Real Hedera transaction IDs for settlement and refund are verifiable on HashScan and Mirror Node.
+- [ ] Zero Solidity deployed on Hedera (100% native Hedera SDK / Agent Kit v4), cleanly targeting the "No Solidity Allowed" track.
 
 ---
 
@@ -1337,8 +1382,8 @@ pulsepay/
 | EVM client           | viem                                          | Typed EVM reads, writes, logs and receipts          |
 | Wallet connection    | wagmi / injected wallet connectors            | Customer and merchant wallet interactions           |
 | Whitechain contracts | Solidity + Foundry                            | Deployment, tests, verification and fuzzing         |
-| Hedera               | `@hashgraph/sdk` plus supported x402 packages | HTS, HCS, transaction and agent integration         |
-| x402                 | Current x402 SDK with Hedera exact scheme     | Avoid manually implementing protocol headers        |
+| Hedera               | `@hashgraph/hedera-agent-kit` (^4.0.0) + `@hiero-ledger/sdk` (^2.81.0) + `@hashgraph/hedera-agent-kit-langchain` (^1.0.0) | HCS, native HBAR transfers, BaseTool plugins, policies and hooks |
+| x402                 | `@x402/core` + `@x402/hedera` (ExactHederaScheme) | Standardized Hedera x402 HTTP challenge & settlement |
 | Uniswap              | Uniswap API/SDK + v4 core/periphery           | Quotes, swaps, positions and hook integration       |
 | Database             | PostgreSQL + Drizzle ORM                      | Normalized events and merchant operations           |
 | Background jobs      | Node worker + Postgres job/outbox tables      | Renewal processing, webhooks and indexing           |
@@ -1364,11 +1409,16 @@ WHITECHAIN_USDT_ADDRESS=0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7
 WHITECHAIN_MERCHANT_HUB=
 
 HEDERA_NETWORK=testnet
+HEDERA_NETWORK_X402=hedera:testnet
 HEDERA_OPERATOR_ID=
 HEDERA_OPERATOR_KEY=
-HEDERA_USDC_TOKEN_ID=
+HEDERA_MERCHANT_ACCOUNT_ID=
+HEDERA_BUYER_ACCOUNT_ID=
+HEDERA_BUYER_KEY=
 HEDERA_AUDIT_TOPIC_ID=
-HEDERA_X402_FACILITATOR_URL=
+HEDERA_X402_FACILITATOR_URL=http://localhost:4020
+FACILITATOR_ACCOUNT_ID=
+FACILITATOR_PRIVATE_KEY=
 
 UNISWAP_CHAIN_ID=1301
 UNISWAP_RPC_URL=
@@ -1438,40 +1488,40 @@ The order below is intentional. Do not build the full dashboard before proving t
 
 **Exit condition:** At least signup + cancel works reliably. A renewal is preferred if time permits.
 
-### Phase 5 — Implement Hedera x402 seller flow
+### Phase 5 — Implement Hedera x402 seller flow & facilitator settlement
 
-30. Create a Hedera testnet account and fund it.
-31. Associate the account with the selected HTS test token, if required.
-32. Set up the Hedera x402 resource-server integration using a facilitator listed in Hedera's current docs.
-33. Create one small paid endpoint, for example `POST /v1/market-data/query`.
-34. Verify an unpaid request returns a valid x402 402 response.
-35. Verify the selected client package can parse the requirements and sign the Hedera payment payload.
-36. Complete a real facilitator verification and settlement.
-37. Save the actual Hedera transaction ID and HashScan URL.
+30. Configure funded ECDSA operator and merchant Hedera testnet accounts using `@hiero-ledger/sdk`.
+31. Verify connection to the Hedera x402 facilitator (`GET /health` and `GET /supported` returns valid fee-payer account).
+32. Set up resource server integration with `@x402/core/server` and `@x402/hedera/exact/server` (`ExactHederaScheme`).
+33. Create protected endpoint `POST /v1/services/:serviceId/query` priced in native HBAR (`asset: "0.0.0"`) and integer tinybars (e.g. `50000000` = 0.5 HBAR).
+34. Verify an unpaid probe returns a compliant HTTP `402 Payment Required` response with `PAYMENT-REQUIRED` headers.
+35. Verify client signs the partial HBAR transfer via `x402HTTPClient` and submits with `PAYMENT-SIGNATURE`.
+36. Facilitator verifies signature, co-signs network submission fees, and settles the transaction on Hedera testnet.
+37. Save verified Hedera transaction ID, HashScan URL, and testnet consensus timestamp.
 
-**Exit condition:** One real x402 payment unlocks a real protected API response.
+**Exit condition:** One real x402 payment settles on Hedera testnet and unlocks the protected API response.
 
-### Phase 6 — Add autonomous discovery and spend controls
+### Phase 6 — Add Hedera Agent Kit v4 plugin & deterministic spend policies
 
-38. Add merchant service registration and `/.well-known/x402.json`.
-39. Add `/v1/agent/services` directory search.
-40. Build the buyer agent to discover a service and call it.
-41. Add max-per-request and daily-budget checks before signing.
-42. Add merchant/domain allowlist and a configurable human-approval threshold.
-43. Demonstrate the agent paying one request without a human approval.
-44. Add duplicate-request/idempotency protection.
+38. Implement merchant service registration and `/.well-known/x402.json` manifest endpoint.
+39. Add `/v1/agent/services` directory search route.
+40. Implement `PulsePayHederaPlugin` implementing `Plugin` from `@hashgraph/hedera-agent-kit`, containing `x402_pay_tool` and `discover_services_tool` extending `BaseTool`.
+41. Implement `PulsePaySpendLimitPolicy` extending `AbstractPolicy` to enforce `maxPerRequestTinybars`, cumulative daily budget, and merchant account allowlist deterministically at Stages 1 and 3 before any transaction signing occurs.
+42. Add `RejectToolPolicy` to block destructive account or token operations.
+43. Instantiate `HederaLangchainToolkit` and demonstrate the buyer agent discovering the service, passing policy checks, and autonomously purchasing the service with zero human clicks.
+44. Verify negative policy enforcement: configure a request exceeding the per-call cap or daily budget and assert that the policy throws without broadcasting any transaction.
 
-**Exit condition:** The agent discovers, evaluates, pays and receives the service autonomously within policy.
+**Exit condition:** The agent discovers, evaluates, pays and consumes the service autonomously within policy guardrails.
 
-### Phase 7 — Add HCS audit and Hedera refund
+### Phase 7 — Add HCS consensus audit hook and native HBAR refund
 
-45. Create a merchant HCS topic or use a configured topic.
-46. Write an HCS event for a settled x402 payment.
-47. Confirm the event through the Mirror Node / topic explorer.
-48. Add a merchant refund action for an x402 purchase using a separate HTS token transfer.
-49. Write a linked refund HCS record and show both transaction IDs.
+45. Create merchant HCS audit topic via `TopicCreateTransaction` in `@hiero-ledger/sdk` with admin/submit keys and memo `"PulsePay Audit Log"`.
+46. Implement `PulsePayHcsAuditHook` extending `AbstractHook` to intercept Stage 7 (`postToolExecutionHook`) and asynchronously dispatch structured `AGENT_PAYMENT_SETTLED` events to the topic.
+47. Confirm the consensus event sequence and message payload via the Hedera Mirror Node REST API (`/api/v1/topics/{topicId}/messages`).
+48. Implement `issue_refund_tool` extending `BaseTool` to execute a native HBAR `TransferTransaction` from merchant to buyer referencing the original settlement transaction ID.
+49. Submit `AGENT_REFUND_SETTLED` audit record to HCS and link both original and refund HashScan links on the merchant dashboard and public receipt view.
 
-**Exit condition:** The dashboard shows a settled agent payment with independently verifiable HCS evidence. Refund is a strong extra-credit demonstration.
+**Exit condition:** The dashboard displays settled agent payments with independently verifiable HCS consensus evidence and working native refunds. Cleanly satisfies 100% native Hedera operation for the "No Solidity Allowed" bonus track.
 
 ### Phase 8 — Build the Uniswap v4 integration
 
@@ -1590,7 +1640,7 @@ Aim for **3 minutes 45 seconds**. This keeps the main video inside Whitechain's 
 | 0:20–1:10 | Customer checkout                | Subscribe/pay $20 in official Whitechain USDT; show transaction status and explorer                                  | Whitechain |
 | 1:10–1:50 | Merchant + customer receipt      | Issue $5 partial refund; show refund tx and customer-verifiable receipt                                              | Whitechain |
 | 1:50–2:20 | Subscription view                | Show active plan, next charge and cancel-anytime control                                                             | Whitechain |
-| 2:20–3:10 | Agent API / terminal + dashboard | Agent discovers service, gets 402, signs and settles x402 payment in HTS USDC, receives response; open HashScan link | Hedera     |
+| 2:20–3:10 | Agent API / terminal + dashboard | Agent discovers service, gets 402, evaluates budget policy, signs and settles x402 payment in native HBAR (tinybars), receives response; open HashScan link | Hedera     |
 | 3:10–3:30 | HCS audit                        | Show the agent-spend audit entry and transaction reference                                                           | Hedera     |
 | 3:30–3:45 | Treasury                         | Show real Uniswap v4 swap, hook policy event and the transaction link                                                | Uniswap    |
 
@@ -1623,16 +1673,17 @@ Aim for **3 minutes 45 seconds**. This keeps the main video inside Whitechain's 
 
 ### 19.2 Hedera submission
 
-- [ ] At least one Hedera x402-protected endpoint.
-- [ ] Endpoint settles on Hedera testnet or mainnet through a supported facilitator or a team-run facilitator.
-- [ ] Agent/client discovers the endpoint and completes at least one paid request end to end.
-- [ ] No human approves the individual demo payment.
-- [ ] README documents setup, architecture and exact payment flow.
-- [ ] README includes a real Hedera transaction ID.
-- [ ] Demo is five minutes or less.
-- [ ] Demo links to the transaction on HashScan.
-- [ ] Spending limits / per-merchant controls shown.
-- [ ] HCS audit topic shown.
+- [ ] At least one Hedera x402-protected endpoint that settles on Hedera testnet/mainnet through a listed facilitator (or self-run).
+- [ ] Autonomous buyer agent discovers the endpoint and completes at least one paid request end to end with zero human approval.
+- [ ] Public GitHub repo with README covering setup, architecture, and payment flow, including the Hedera transaction ID of at least one settled payment.
+- [ ] Demo video of five minutes or less showing payment settling and linking directly to HashScan.
+- [ ] **Extra Points Achieved:**
+  - [ ] Spending controls for agents: budgets, per-merchant limits, allowlists via `PulsePaySpendLimitPolicy` extending `AbstractPolicy`.
+  - [ ] Tamper-evident HCS topic audit log for agent spending via `PulsePayHcsAuditHook` extending `AbstractHook`.
+  - [ ] Built with official Hedera Agent Kit v4 (`@hashgraph/hedera-agent-kit`) using `BaseTool` plugins.
+  - [ ] Research/comparison agent logic comparing pricing across registered directory services before purchase.
+  - [ ] Native HBAR (`asset: "0.0.0"`) and HTS token support.
+  - [ ] 100% Native Hedera services (HTS + HCS, Zero Solidity on Hedera), qualifying for the "No Solidity Allowed" track.
 
 ### 19.3 Uniswap Foundation submission
 

@@ -1,0 +1,21 @@
+{
+  "name": "pulsepay-demo-store",
+  "version": "1.0.0",
+  "description": "Acme Studio demo SaaS integrating PulsePay checkout, subscriptions, verifiable receipts, and Hedera x402 API",
+  "main": "./dist/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@pulsepay/shared": "workspace:*",
+    "@pulsepay/sdk-core": "workspace:*",
+    "@pulsepay/sdk-server": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.3"
+  }
+}
+

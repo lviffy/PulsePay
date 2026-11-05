@@ -1,0 +1,20 @@
+{
+  "name": "@pulsepay/adapter-whitechain",
+  "version": "1.0.0",
+  "description": "Whitechain EVM client, ABI bindings, and indexer for PulsePay",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@pulsepay/shared": "workspace:*",
+    "viem": "^2.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
+
