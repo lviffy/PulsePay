@@ -88,7 +88,8 @@ export interface NormalizedActivity {
     | "AGENT_SPEND_SETTLED"
     | "AGENT_REFUND_SETTLED"
     | "TREASURY_SWAP"
-    | "TREASURY_LP_UPDATED";
+    | "TREASURY_LP_UPDATED"
+    | "TREASURY_SWEEP";
   from: string;
   to: string;
   asset: string;
