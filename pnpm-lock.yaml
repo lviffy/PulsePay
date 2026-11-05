@@ -62,6 +62,37 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  apps/sdk-demo:
+    dependencies:
+      '@pulsepay/adapter-hedera':
+        specifier: workspace:*
+        version: link:../../packages/adapter-hedera
+      '@pulsepay/adapter-uniswap':
+        specifier: workspace:*
+        version: link:../../packages/adapter-uniswap
+      '@pulsepay/adapter-whitechain':
+        specifier: workspace:*
+        version: link:../../packages/adapter-whitechain
+      '@pulsepay/sdk-core':
+        specifier: workspace:*
+        version: link:../../packages/sdk-core
+      '@pulsepay/sdk-server':
+        specifier: workspace:*
+        version: link:../../packages/sdk-server
+      '@pulsepay/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      viem:
+        specifier: ^2.23.0
+        version: 2.57.16(typescript@5.9.3)(zod@4.6.7)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.5
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/adapter-hedera:
     dependencies:
       '@hashgraph/hedera-agent-kit':
@@ -134,6 +165,9 @@ importers:
       '@pulsepay/shared':
         specifier: workspace:*
         version: link:../shared
+      viem:
+        specifier: ^2.23.0
+        version: 2.57.16(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
       '@types/react':
         specifier: ^19.0.0

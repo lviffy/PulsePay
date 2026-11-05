@@ -8,6 +8,8 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "demo": "pnpm --filter pulsepay-sdk-demo start",
+    "demo:web": "pnpm --filter pulsepay-sdk-demo web",
     "build:hedera": "bun run --cwd packages/shared build && bun run --cwd packages/adapter-hedera build && bun run --cwd packages/sdk-server build && bun run --cwd apps/agent-worker build && bun run --cwd apps/demo-store build",
     "test:hedera": "bun run build:hedera && bun run --cwd packages/adapter-hedera test && bun run --cwd packages/sdk-server test",
     "contracts:whitechain:build": "cd contracts/whitechain && ../../.bin/forge build",
@@ -31,7 +33,6 @@
     "turbo": "^2.4.0",
     "typescript": "^5.7.3"
   },
-  "packageManager": "pnpm@10.12.4",
   "workspaces": [
     "apps/*",
     "packages/*"
