@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createWalletClient, custom, whitechainSepolia } from "@pulsepay/sdk-core";
 import { usePulsePay } from "./context.js";
 import {
   WHITECHAIN_USDT_ADDRESS,
@@ -48,11 +49,11 @@ export function PulsePayCheckout({
           targetUsdtAmountUnits: invoiceAmountUnits,
           payerAddress: "0x0000000000000000000000000000000000000000",
         })
-        .then((q) => {
+        .then((q: SwapQuote) => {
           setQuote(q);
           setLoadingQuote(false);
         })
-        .catch((err) => {
+        .catch((err: Error) => {
           console.error("Quote error:", err);
           setLoadingQuote(false);
         });
@@ -64,17 +65,103 @@ export function PulsePayCheckout({
       setStatus("PENDING");
       setErrorMessage(null);
 
-      // Simulation / wallet dispatch
-      // In production connected via wagmi/injected wallet
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Verify browser Web3 wallet provider
+      if (typeof window === "undefined" || !(window as any).ethereum) {
+        throw new Error(
+          "No Web3 wallet detected. Please install MetaMask or another Web3 browser extension."
+        );
+      }
 
-      const mockTxHash = `0x${Array.from({ length: 64 }, () =>
-        Math.floor(Math.random() * 16).toString(16)
-      ).join("")}`;
+      const ethereum = (window as any).ethereum;
 
-      setTxHash(mockTxHash);
+      // Request user account authorization
+      const accounts = (await ethereum.request({
+        method: "eth_requestAccounts",
+      })) as string[];
+
+      if (!accounts || accounts.length === 0) {
+        throw new Error("No account authorized by wallet");
+      }
+      const userAccount = accounts[0] as `0x${string}`;
+
+      // Ensure wallet is switched to Whitechain Sepolia (chainId 1874 / hex 0x752)
+      try {
+        await ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x752" }],
+        });
+      } catch (switchError: any) {
+        if (switchError.code === 4902) {
+          await ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: "0x752",
+                chainName: "Whitechain Sepolia",
+                nativeCurrency: { name: "WBT", symbol: "WBT", decimals: 18 },
+                rpcUrls: ["https://rpc.testnet.whitechain.io"],
+                blockExplorerUrls: [WHITECHAIN_SEPOLIA_EXPLORER],
+              },
+            ],
+          });
+        } else {
+          throw switchError;
+        }
+      }
+
+      const walletClient = createWalletClient({
+        account: userAccount,
+        chain: whitechainSepolia,
+        transport: custom(ethereum),
+      });
+
+      let genuineTxHash: string;
+
+      if (paymentMethod === "SWAP") {
+        // Real Swap & Pay execution using Uniswap routing
+        const tokenInAddress = (
+          selectedToken === "WETH"
+            ? "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
+            : "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238"
+        ) as `0x${string}`;
+
+        const swapResult = await client.routing.executeSwap(
+          walletClient,
+          {
+            tokenInAddress,
+            tokenInSymbol: selectedToken,
+            tokenInDecimals: selectedToken === "WETH" ? 18 : 6,
+            tokenOutAddress: WHITECHAIN_USDT_ADDRESS,
+            targetUsdtAmountUnits: invoiceAmountUnits,
+            maxInputAmountUnits: quote ? BigInt(quote.inputAmount) : undefined,
+            recipient: userAccount,
+            payerAddress: userAccount,
+            slippageTolerancePercent: quote?.slippageTolerance ?? 0.5,
+          },
+          userAccount
+        );
+        genuineTxHash = swapResult.txHash;
+      } else {
+        // Format invoiceId to bytes32 hex
+        let formattedInvoiceId: `0x${string}`;
+        if (invoiceId.startsWith("0x") && invoiceId.length === 66) {
+          formattedInvoiceId = invoiceId as `0x${string}`;
+        } else {
+          let hex = "";
+          for (let i = 0; i < invoiceId.length; i++) {
+            hex += invoiceId.charCodeAt(i).toString(16).padStart(2, "0");
+          }
+          formattedInvoiceId = `0x${hex.padEnd(64, "0").slice(0, 64)}` as `0x${string}`;
+        }
+
+        // Execute real onchain USDT payment & settlement via Whitechain contract
+        const result = await client.whitechain.payInvoice(formattedInvoiceId, walletClient);
+        genuineTxHash = result.txHash;
+      }
+
+      setTxHash(genuineTxHash);
       setStatus("CONFIRMED");
-      onSuccess?.(mockTxHash);
+      onSuccess?.(genuineTxHash);
     } catch (err: any) {
       setStatus("ERROR");
       setErrorMessage(err.message || "Payment transaction failed");

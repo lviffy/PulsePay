@@ -11,7 +11,9 @@
   "dependencies": {
     "@pulsepay/shared": "workspace:*",
     "@pulsepay/sdk-core": "workspace:*",
-    "@pulsepay/sdk-server": "workspace:*"
+    "@pulsepay/sdk-server": "workspace:*",
+    "@pulsepay/adapter-uniswap": "workspace:*",
+    "viem": "^2.23.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

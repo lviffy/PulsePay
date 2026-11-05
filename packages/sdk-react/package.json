@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@pulsepay/sdk-core": "workspace:*",
-    "@pulsepay/shared": "workspace:*"
+    "@pulsepay/shared": "workspace:*",
+    "viem": "^2.23.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
