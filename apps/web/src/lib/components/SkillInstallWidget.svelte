@@ -73,7 +73,6 @@
 <div class="skill-widget" aria-label="NPX Skill Installer">
 	<div class="skill-header">
 		<div class="skill-title mono">
-			<span class="status-pulse"></span>
 			<span>Agent Skill Installer / NPX</span>
 		</div>
 		<div class="skill-tabs-nav" role="tablist" aria-label="Coding Tool Selector">
@@ -114,176 +113,81 @@
 
 <style>
 	.skill-widget {
-		background: var(--ink);
-		color: var(--cream);
-		border: 1px solid #3e3e37;
-		border-radius: 12px;
+		color: var(--ink);
+		border-top: 1px solid var(--rule);
+		border-bottom: 1px solid var(--rule);
 		margin: 28px 0 40px;
-		overflow: hidden;
-		box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+		min-width: 0;
 	}
-
 	.skill-header {
-		padding: 14px 18px 0;
-		border-bottom: 1px solid #42423a;
-		background: #191917;
-	}
-
-	.skill-title {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 8px;
-		font-size: 11px;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		color: #b4b3a6;
-		margin-bottom: 12px;
+		justify-content: space-between;
+		gap: 16px;
+		padding: 18px 0;
+		border-bottom: 1px solid var(--rule);
 	}
-
-	.status-pulse {
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		background: var(--orange);
-		box-shadow: 0 0 8px var(--orange);
-		display: inline-block;
-	}
-
-	.skill-tabs-nav {
-		display: flex;
-		gap: 4px;
-		overflow-x: auto;
-		scrollbar-width: none;
-		margin-bottom: -1px;
-	}
-
-	.skill-tabs-nav::-webkit-scrollbar {
-		display: none;
-	}
-
+	.skill-title { color: var(--muted); font-size: 9px; letter-spacing: .1em; }
+	.skill-tabs-nav { display: flex; max-width: 100%; gap: 4px; overflow-x: auto; }
 	.skill-tab-btn {
-		font-family: var(--mono);
-		font-size: 10px;
-		letter-spacing: 0.06em;
+		flex-shrink: 0;
+		font: 9px var(--mono);
+		letter-spacing: .04em;
 		text-transform: uppercase;
-		padding: 9px 14px;
+		padding: 9px 10px;
 		background: transparent;
-		color: #a4a396;
-		border: 1px solid transparent;
-		border-bottom: 2px solid transparent;
-		border-radius: 6px 6px 0 0;
+		color: var(--muted);
+		border: 0;
+		border-radius: 4px;
 		cursor: pointer;
 		white-space: nowrap;
-		transition: all 0.15s ease;
+		transition: background-color .18s, color .18s;
 	}
-
-	.skill-tab-btn:hover {
-		color: var(--cream);
-		background: #2a2a26;
-	}
-
-	.skill-tab-btn.active {
-		color: var(--cream);
-		background: var(--ink);
-		border-color: #42423a #42423a transparent;
-		border-bottom: 2px solid var(--orange);
-		font-weight: 500;
-	}
-
-	.skill-terminal {
-		padding: 20px 22px;
-		background: var(--ink);
-	}
-
-	.terminal-body {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		background: #141412;
-		border: 1px solid #33332c;
-		border-radius: 6px;
-		padding: 14px 18px;
-	}
-
-	.terminal-prompt {
-		color: var(--orange);
-		font-size: 14px;
-		font-weight: bold;
-		user-select: none;
-	}
-
+	.skill-tab-btn:hover { background: var(--soft); color: var(--ink); }
+	.skill-tab-btn.active { background: var(--ink); color: var(--cream); }
+	.skill-terminal { padding: 18px 0; }
+	.terminal-body { display: flex; align-items: center; gap: 12px; min-width: 0; }
+	.terminal-prompt { color: var(--muted); user-select: none; }
 	.terminal-code {
 		flex: 1;
-		font-size: 13px;
-		color: var(--cream);
-		word-break: break-all;
+		min-width: 0;
+		font-size: 12px;
+		letter-spacing: 0;
+		text-transform: none;
+		overflow-wrap: anywhere;
 	}
-
 	.terminal-copy-btn {
-		background: #2e2e28;
-		color: var(--cream);
-		border: 1px solid #4a4a40;
+		flex-shrink: 0;
+		background: transparent;
+		color: var(--ink);
+		border: 1px solid var(--rule);
 		border-radius: 4px;
-		padding: 7px 14px;
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
+		padding: 9px 14px;
+		font-size: 9px;
 		cursor: pointer;
-		transition: all 0.15s ease;
-		white-space: nowrap;
+		transition: background-color .18s, transform .18s;
 	}
-
-	.terminal-copy-btn:hover {
-		background: var(--orange);
-		color: #000;
-		border-color: var(--orange);
-	}
-
+	.terminal-copy-btn:hover { background: var(--soft); transform: translateY(-2px); }
+	.terminal-copy-btn:active { transform: translateY(1px); }
 	.terminal-meta {
 		margin-top: 14px;
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		font-size: 11px;
-	}
-
-	.meta-item {
-		display: flex;
-		align-items: center;
+		display: grid;
 		gap: 8px;
-		color: #bab9ad;
-	}
-
-	.meta-label {
-		color: #7a796e;
-		text-transform: uppercase;
+		color: var(--muted);
 		font-size: 10px;
+		letter-spacing: .025em;
+		text-transform: none;
+		line-height: 1.7;
 	}
-
-	.meta-val {
-		color: #e5e3d8;
-		background: #1f1f1b;
-		padding: 2px 7px;
-		border-radius: 3px;
-		border: 1px solid #383830;
-	}
-
-	.meta-note {
-		color: #8f8e83;
-		font-size: 11px;
-		line-height: 1.5;
-	}
-
-	@media (max-width: 768px) {
-		.terminal-body {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 10px;
-		}
-
-		.terminal-copy-btn {
-			align-self: flex-end;
-		}
+	.meta-item { display: flex; flex-wrap: wrap; gap: 8px; }
+	.meta-label { text-transform: uppercase; font-size: 9px; }
+	.meta-val { color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
+	@media (max-width: 640px) {
+		.skill-header { align-items: flex-start; gap: 14px; }
+		.skill-tabs-nav { width: 100%; }
+		.terminal-code { font-size: 11px; }
+		.terminal-body { flex-wrap: wrap; }
+		.terminal-copy-btn { margin-left: auto; }
 	}
 </style>
-

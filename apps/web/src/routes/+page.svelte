@@ -127,21 +127,21 @@
 </script>
 
 <svelte:head>
-	<title>PulsePay — Pay in any token. Settle in USDT.</title>
+	<title>PulsePay — Payments for people and agents.</title>
 	<meta
 		name="description"
-		content="Invoices, reserve-backed refunds and subscriptions on Whitechain. Chainlink CCIP 2.0 token bridging. Native Hedera agent payments with an HCS audit trail."
+		content="Accept crypto payments, automate subscriptions, and let agents pay for services. One SDK connects checkout, settlement, refunds, and verifiable receipts."
 	/>
 </svelte:head>
 
 <main id="main" bind:this={scope}>
 	<section class="hero">
 		<div class="hero-copy">
-			<p class="eyebrow">Unified onchain payment stack · ETHGlobal Mumbai</p>
-			<h1 data-hero-title>Pay in any <br />token. <br />Settle in <br />USDT.</h1>
+			<p class="eyebrow">One SDK. Every payment.</p>
+			<h1 data-hero-title>Payments for <br />people. <br />And agents.</h1>
 			<p class="hero-lede">
-				Invoices, reserve-backed refunds and subscriptions on Whitechain. Token bridging through
-				Chainlink CCIP 2.0. Agents that pay over x402 on Hedera, with an audit trail on consensus.
+				Accept crypto at checkout, run subscriptions, and let agents pay for services.
+				Connect it all with one SDK, from the first invoice to a verifiable receipt.
 			</p>
 			<div class="actions">
 				<a href="/merchant" class="button">Open console ↗</a>
@@ -169,9 +169,8 @@
 		<div class="dither-band" aria-hidden="true"></div>
 		<p class="eyebrow" data-decode>001 / THE SDK</p>
 		<h2>One component to a<br class="mobile-break" /> live checkout.</h2>
-		<SdkInstallWidget />
 		<RepoExplorer files={data.files} initial={data.initial} pinned={true} />
-		<p class="section-note mono">Real files from this monorepo. Read, copy, build.</p>
+		<SdkInstallWidget />
 	</section>
 
 	<section class="feature-section section-pad" id="features">

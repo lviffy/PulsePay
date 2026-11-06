@@ -71,6 +71,14 @@ export function onFrame(frame: Frame) {
 
 let lenisInstance: Lenis | undefined;
 
+export function scrollPageBy(delta: number) {
+	if (lenisInstance) {
+		lenisInstance.scrollTo(lenisInstance.targetScroll + delta, { programmatic: false });
+	} else {
+		window.scrollBy({ top: delta, behavior: 'instant' });
+	}
+}
+
 export function initMotion(pathname: string) {
 	if (typeof window === 'undefined') return () => {};
 

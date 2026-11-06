@@ -16,6 +16,6 @@
 		<a href="/llms.txt" data-sveltekit-reload rel="external">llms.txt ↗</a>
 		<a href="/openapi.json" data-sveltekit-reload rel="external">API ↗</a>
 	</div>
-	<small>© {new Date().getFullYear()} PulsePay · Built at ETHGlobal Mumbai</small>
+	<small>© {new Date().getFullYear()} PulsePay</small>
 </footer>
 
