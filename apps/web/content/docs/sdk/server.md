@@ -6,11 +6,21 @@ This page follows the implementation in `packages/sdk-server/src/x402.ts`. The s
 
 ## 02 / Quickstart
 
+Install `@pulsepay/sdk-server` from the npm registry:
+
+```bash
+npm install @pulsepay/sdk-server @pulsepay/shared
+# or with pnpm
+pnpm add @pulsepay/sdk-server @pulsepay/shared
+```
+
+For workspace developers running local test suites:
+
 ```bash
 pnpm --filter @pulsepay/sdk-server test
 ```
 
-Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use.
+Published as [`@pulsepay/sdk-server` on npm](https://www.npmjs.com/package/@pulsepay/sdk-server). Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use.
 
 ## 03 / Walkthrough
 

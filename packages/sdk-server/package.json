@@ -6,6 +6,23 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lviffy/ETHGLOBAL.git",
+    "directory": "packages/sdk-server"
+  },
+  "bugs": {
+    "url": "https://github.com/lviffy/ETHGLOBAL/issues"
+  },
+  "homepage": "https://github.com/lviffy/ETHGLOBAL#readme",
   "scripts": {
     "build": "tsc",
     "test": "node test/x402.test.mjs",

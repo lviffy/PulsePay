@@ -6,12 +6,20 @@ This page follows the implementation in `packages/adapter-hedera/src/plugin.ts`.
 
 ## 02 / Quickstart
 
+Install `@pulsepay/adapter-hedera` from the npm registry:
+
+```bash
+npm install @pulsepay/adapter-hedera @hashgraph/hedera-agent-kit @hiero-ledger/sdk viem
+```
+
+For workspace developers building and testing from source:
+
 ```bash
 pnpm --filter @pulsepay/adapter-hedera build
 pnpm --filter @pulsepay/adapter-hedera test
 ```
 
-Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use. A funded account is needed only for wallet-authorized writes. No Solidity deployment is required.
+Published as [`@pulsepay/adapter-hedera` on npm](https://www.npmjs.com/package/@pulsepay/adapter-hedera). Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use. A funded account is needed only for wallet-authorized writes. No Solidity deployment is required.
 
 ## 03 / Walkthrough
 

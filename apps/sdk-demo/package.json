@@ -1,6 +1,7 @@
 {
   "name": "pulsepay-sdk-demo",
   "version": "1.0.0",
+  "private": true,
   "description": "Interactive demonstration application and CLI walkthrough for the PulsePay SDK",
   "main": "./dist/cli.js",
   "type": "module",

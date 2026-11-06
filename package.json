@@ -21,6 +21,8 @@
     "test:unit": "turbo run test",
     "test:contracts": "pnpm contracts:whitechain:test && pnpm contracts:uniswap:test && pnpm contracts:hedera:test",
     "verify": "pnpm lint && pnpm build && pnpm test && pnpm audit --audit-level=high",
+    "packages:publish": "pnpm --filter '@pulsepay/*' publish --access public --no-git-checks",
+    "packages:publish:dry": "pnpm --filter '@pulsepay/*' publish --dry-run --access public --no-git-checks",
     "dev:web": "node scripts/dev.mjs --web-only",
     "dev:api": "node scripts/run-app.mjs demo-store --watch",
     "test:dev": "node --test scripts/dev.test.mjs"

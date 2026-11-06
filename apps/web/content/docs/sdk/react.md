@@ -6,11 +6,21 @@ This page follows the implementation in `packages/sdk-react/src/checkout.tsx`. T
 
 ## 02 / Quickstart
 
+Install `@pulsepay/sdk-react` from the npm registry:
+
+```bash
+npm install @pulsepay/sdk-react @pulsepay/sdk-core viem react react-dom
+# or with pnpm
+pnpm add @pulsepay/sdk-react @pulsepay/sdk-core viem react react-dom
+```
+
+For workspace developers building from source:
+
 ```bash
 pnpm --filter @pulsepay/sdk-react build
 ```
 
-Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use.
+Published as [`@pulsepay/sdk-react` on npm](https://www.npmjs.com/package/@pulsepay/sdk-react). Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use.
 
 ## 03 / Walkthrough
 

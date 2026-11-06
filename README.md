@@ -2,6 +2,36 @@
 
 PulsePay combines a Whitechain USDT merchant contract and TypeScript SDK, a Uniswap v4 treasury guard, and a native Hedera HTTP-402 payment flow.
 
+## Official NPM packages
+
+All PulsePay SDKs and adapters are published to the npm registry under the `@pulsepay` scope:
+
+```bash
+# Core client & universal checkout
+npm install @pulsepay/sdk-core viem
+
+# React checkout widget & billing components
+npm install @pulsepay/sdk-react @pulsepay/sdk-core viem
+
+# Server middleware & x402 resource server gateway
+npm install @pulsepay/sdk-server @pulsepay/shared
+
+# Chain & protocol adapters
+npm install @pulsepay/adapter-whitechain viem
+npm install @pulsepay/adapter-uniswap viem
+npm install @pulsepay/adapter-hedera @hashgraph/hedera-agent-kit @hiero-ledger/sdk viem
+```
+
+| Package | Version | npm | Description |
+| :--- | :--- | :--- | :--- |
+| [`@pulsepay/sdk-core`](packages/sdk-core) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/sdk-core)](https://www.npmjs.com/package/@pulsepay/sdk-core) | Core TypeScript client, invoice/subscription lifecycle, quote routing |
+| [`@pulsepay/sdk-react`](packages/sdk-react) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/sdk-react)](https://www.npmjs.com/package/@pulsepay/sdk-react) | React checkout widget, receipt verifier, and billing components |
+| [`@pulsepay/sdk-server`](packages/sdk-server) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/sdk-server)](https://www.npmjs.com/package/@pulsepay/sdk-server) | Server middleware, x402 resource server gateway, and webhooks |
+| [`@pulsepay/shared`](packages/shared) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/shared)](https://www.npmjs.com/package/@pulsepay/shared) | Shared schemas, Zod types, and accountant CSV formatters |
+| [`@pulsepay/adapter-whitechain`](packages/adapter-whitechain) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-whitechain)](https://www.npmjs.com/package/@pulsepay/adapter-whitechain) | Whitechain EVM client, ABI bindings, and indexer |
+| [`@pulsepay/adapter-uniswap`](packages/adapter-uniswap) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-uniswap)](https://www.npmjs.com/package/@pulsepay/adapter-uniswap) | Uniswap Trading API routing & Uniswap v4 treasury guard |
+| [`@pulsepay/adapter-hedera`](packages/adapter-hedera) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-hedera)](https://www.npmjs.com/package/@pulsepay/adapter-hedera) | Hedera Agent Kit v4 spend policy, HCS audit hook & x402 |
+
 ## What works
 
 - **Whitechain:** invoices, reserve-backed refunds, subscriptions and balances in `PulsePayMerchantHub.sol`. The SDK provides transaction encoders and direct USDT wallet checkout. Checkout confirms the wallet/RPC network, reads the actual invoice, approves only its amount when needed, and reports success only after a matching settlement event.
