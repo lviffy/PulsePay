@@ -5,7 +5,7 @@ import { resolve, delimiter } from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const turbo = resolve(root, 'node_modules/turbo/bin/turbo');
-const next = resolve(root, 'apps/web/node_modules/next/dist/bin/next');
+const vite = resolve(root, 'apps/web/node_modules/.bin/vite');
 const prepare = resolve(root, 'apps/web/scripts/prepare.mjs');
 const children = new Set();
 let stopping = false;
@@ -72,18 +72,18 @@ try {
       throw new Error(`Recursive pnpm launcher detected at ${pnpmPath}. Point pnpm at its installed standalone binary instead of npx.`);
     }
   }
-  for (const entry of [turbo, next, prepare]) {
+  for (const entry of [turbo, vite, prepare]) {
     if (!existsSync(entry)) throw new Error(`Missing ${entry}. Install workspace dependencies first.`);
   }
   if (process.argv.includes('--check')) {
-    console.log('Dev launcher ready: package build → package watch + Next.js on http://localhost:3100');
+    console.log('Dev launcher ready: package build → package watch + SvelteKit on http://localhost:3100');
     console.log('Commands use Node directly; production web builds are excluded from the watcher.');
   } else {
     await run(turbo, ['run', 'build', '--filter=./packages/*', '--concurrency=2']);
     if (!stopping) await run(prepare);
     if (!stopping) {
       supervise(start(process.execPath, [turbo, 'watch', 'build', '--filter=./packages/*', '--concurrency=2']));
-      supervise(start(process.execPath, [next, 'dev', '--hostname', '0.0.0.0', '--port', '3100'], {
+      supervise(start(vite, ['dev', '--host', '0.0.0.0', '--port', '3100'], {
         cwd: resolve(root, 'apps/web'),
         env: { ...process.env, PULSEPAY_WEB_DEV: '1' },
       }));

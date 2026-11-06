@@ -1,30 +1,24 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "$app/tsconfig",
   "compilerOptions": {
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
-    "baseUrl": ".",
-    "types": [
-      "node"
-    ],
-    "strict": true
+    "allowJs": true,
+    "checkJs": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "strict": true,
+    "moduleResolution": "bundler"
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    "next-env.d.ts",
-    ".next-dev/types/**/*.ts"
+    "src",
+    "src/**/*.js",
+    "src/**/*.ts",
+    "src/**/*.svelte"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "legacy-next"
   ]
 }

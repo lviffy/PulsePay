@@ -1,0 +1,19 @@
+export function seededPattern(seed: string, columns = 80, rows = 38) {
+	let state = 2166136261;
+	for (const char of seed) state = Math.imul(state ^ char.charCodeAt(0), 16777619);
+	const random = () => {
+		state ^= state << 13;
+		state ^= state >>> 17;
+		state ^= state << 5;
+		return (state >>> 0) / 4294967296;
+	};
+	const points: Array<{ x: number; y: number; alpha: number }> = [];
+	for (let y = 0; y < rows; y++)
+		for (let x = 0; x < columns; x++) {
+			const distance = Math.hypot((x - columns / 2) / columns, (y - rows / 2) / rows);
+			if (random() > 0.45 + Math.sin(distance * 22) * 0.3)
+				points.push({ x, y, alpha: random() > 0.6 ? 1 : 0.35 });
+		}
+	return points;
+}
+

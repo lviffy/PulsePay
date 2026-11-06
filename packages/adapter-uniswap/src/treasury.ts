@@ -88,7 +88,7 @@ export class UniswapV4TreasuryAdapter {
         abi: treasuryGuardHookAbi,
         functionName: "owner",
       }),
-      this.publicClient.readContract({ address: this.hookAddress, abi: treasuryGuardHookAbi, functionName: "limitCurrency" }),
+      this.publicClient.readContract({ address: this.hookAddress, abi: treasuryGuardHookAbi, functionName: "limitCurrency" }).catch(() => "0x0000000000000000000000000000000000000000" as `0x${string}`),
     ]);
 
     return { maxSwapAmount, paused, owner, limitCurrency };

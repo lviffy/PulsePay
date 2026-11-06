@@ -48,5 +48,10 @@
   "engines": {
     "node": ">=22.13.0"
   },
-  "packageManager": "pnpm@12.14.0"
+  "packageManager": "pnpm@12.14.0",
+  "overrides": {
+    "ws@>=8.0.0 <8.21.0": "^8.21.0",
+    "minimatch@>=7.0.0 <11.0.1": "^11.0.1",
+    "tmp@<0.2.6": "^0.2.6"
+  }
 }
