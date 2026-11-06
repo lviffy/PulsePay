@@ -1,0 +1,26 @@
+{
+  "name": "pulsepay-sdk-demo",
+  "version": "1.0.0",
+  "description": "Interactive demonstration application and CLI walkthrough for the PulsePay SDK",
+  "main": "./dist/cli.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node dist/cli.js",
+    "web": "tsc && node dist/server.js",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@pulsepay/shared": "workspace:*",
+    "@pulsepay/sdk-core": "workspace:*",
+    "@pulsepay/sdk-server": "workspace:*",
+    "@pulsepay/adapter-whitechain": "workspace:*",
+    "@pulsepay/adapter-uniswap": "workspace:*",
+    "@pulsepay/adapter-hedera": "workspace:*",
+    "viem": "^2.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.3"
+  }
+}

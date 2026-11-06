@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {UniswapRoutingAdapter} from '../dist/index.js';
 const input='0x1111111111111111111111111111111111111111',output='0x2222222222222222222222222222222222222222';
 const params={tokenInAddress:input,tokenInSymbol:'WETH',tokenInDecimals:18,tokenOutAddress:output,targetUsdtAmountUnits:20000000n,payerAddress:'0x3333333333333333333333333333333333333333'};
-test('missing key and unsupported Whitechain cannot produce synthetic quotes',async()=>{
+test('unsupported Whitechain is rejected and keyless quotes use the onchain quoter',async()=>{
  assert.throws(()=>new UniswapRoutingAdapter({chainId:1874}),/not supported/);
- await assert.rejects(new UniswapRoutingAdapter().getExactOutputQuote(params),/API_KEY/);
+ const publicClient={readContract:async()=>[123n,0n,0,140000n]};
+ const quote=await new UniswapRoutingAdapter({publicClient}).getExactOutputQuote(params);
+ assert.equal(quote.inputAmount,'123');assert.match(quote.route,/On-Chain Quoter/);
 });
 test('real exact-output API request preserves amounts and validates the response',async(t)=>{
  let calls=0;

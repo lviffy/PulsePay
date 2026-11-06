@@ -35,6 +35,9 @@ export class PulsePayClient {
   get invoices() {
     return {
       get: (id: `0x${string}`) => this.whitechain.getInvoice(id),
+      create: this.whitechain.createInvoice.bind(this.whitechain),
+      cancel: this.whitechain.cancelInvoice.bind(this.whitechain),
+      pay: this.whitechain.payInvoice.bind(this.whitechain),
       encodeCreate: this.whitechain.encodeCreateInvoice.bind(this.whitechain),
       encodeCancel: this.whitechain.encodeCancelInvoice.bind(this.whitechain),
       encodePay: this.whitechain.encodePayInvoice.bind(this.whitechain),
@@ -45,6 +48,9 @@ export class PulsePayClient {
   get payments() {
     return {
       get: (id: `0x${string}`) => this.whitechain.getPayment(id),
+      refund: this.whitechain.issueRefund.bind(this.whitechain),
+      withdraw: this.whitechain.withdrawAvailable.bind(this.whitechain),
+      fundReserve: this.whitechain.fundRefundReserve.bind(this.whitechain),
       encodeRefund: this.whitechain.encodeIssueRefund.bind(this.whitechain),
       encodeApproveUsdt: this.whitechain.encodeApproveUsdt.bind(this.whitechain),
       getBalances: (merchant: `0x${string}`) => this.whitechain.getMerchantBalances(merchant),
@@ -58,6 +64,10 @@ export class PulsePayClient {
     return {
       get: (id: `0x${string}`) => this.whitechain.getSubscription(id),
       getPlan: (id: `0x${string}`) => this.whitechain.getPlan(id),
+      createPlan: this.whitechain.createPlan.bind(this.whitechain),
+      subscribe: this.whitechain.createSubscription.bind(this.whitechain),
+      chargeRenewal: this.whitechain.chargeRenewal.bind(this.whitechain),
+      cancel: this.whitechain.cancelSubscription.bind(this.whitechain),
       encodeCreatePlan: this.whitechain.encodeCreatePlan.bind(this.whitechain),
       encodeSubscribe: this.whitechain.encodeCreateSubscription.bind(this.whitechain),
       encodeChargeRenewal: this.whitechain.encodeChargeRenewal.bind(this.whitechain),
@@ -90,4 +100,3 @@ export function createPulsePay(config: PulsePayConfig): PulsePayClient {
 export * from "@pulsepay/shared";
 export * from "@pulsepay/adapter-whitechain";
 export * from "@pulsepay/adapter-uniswap";
-

@@ -8,6 +8,8 @@
     "dev": "pnpm build && node scripts/dev.mjs",
     "lint": "turbo run lint && eslint scripts eslint.config.mjs",
     "test": "pnpm test:unit && pnpm test:contracts",
+    "demo": "pnpm --filter pulsepay-sdk-demo start",
+    "demo:web": "pnpm --filter pulsepay-sdk-demo web",
     "build:hedera": "pnpm build",
     "test:hedera": "pnpm build && pnpm --filter @pulsepay/adapter-hedera test && pnpm --filter @pulsepay/sdk-server test",
     "contracts:whitechain:build": "node scripts/forge.mjs whitechain build",
@@ -30,17 +32,18 @@
   "author": "PulsePay Team",
   "license": "MIT",
   "devDependencies": {
+    "solc": "0.8.26",
     "turbo": "^2.4.0",
     "typescript": "^5.7.3",
     "eslint": "^9.39.0",
     "typescript-eslint": "^8.46.0"
   },
-  "packageManager": "pnpm@12.14.0",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "engines": {
     "node": ">=22.13.0"
-  }
+  },
+  "packageManager": "pnpm@12.14.0"
 }

@@ -8,8 +8,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "lint": "eslint src",
-    "test": "node test/routing.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@pulsepay/shared": "workspace:*",

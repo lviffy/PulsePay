@@ -16,6 +16,7 @@
     "@pulsepay/sdk-core": "workspace:*",
     "@pulsepay/sdk-server": "workspace:*",
     "@pulsepay/adapter-uniswap": "workspace:*",
+    "viem": "^2.23.0",
     "@pulsepay/adapter-hedera": "workspace:*"
   },
   "devDependencies": {

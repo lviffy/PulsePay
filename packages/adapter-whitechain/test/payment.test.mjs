@@ -15,7 +15,7 @@ function setup({allowance=0n,chain=1874,receiptStatus='success',event=true}={}){
  const walletClient={getChainId:async()=>chain,getAddresses:async()=>[payer],sendTransaction:async()=>{sends++;return hash;}};
  return {adapter:new WhitechainAdapter({contractAddress:hub,publicClient,walletClient}),count:()=>sends};
 }
-test('checkout submits exact approval and payment then verifies settlement event',async()=>{const c=setup();assert.equal(await c.adapter.payInvoice(id),hash);assert.equal(c.count(),2);});
+test('checkout submits exact approval and payment then verifies settlement event',async()=>{const c=setup();assert.equal((await c.adapter.payInvoice(id)).txHash,hash);assert.equal(c.count(),2);});
 test('sufficient allowance skips an unnecessary approval',async()=>{const c=setup({allowance:20000000n});await c.adapter.payInvoice(id);assert.equal(c.count(),1);});
 test('network mismatch, reverted approval and missing settlement event cannot report success',async()=>{
  const wrong=setup({chain:1});await assert.rejects(wrong.adapter.payInvoice(id),/1874/);assert.equal(wrong.count(),0);
