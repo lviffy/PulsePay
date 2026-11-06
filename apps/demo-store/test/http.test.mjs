@@ -7,14 +7,19 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const entry=fileURLToPath(new URL('../dist/index.js',import.meta.url));
 const secret='a-test-only-secret-with-more-than-32-characters';
-async function start(t,demo=false){
+async function start(t,demo=false,extraEnv={}){
  const cwd=mkdtempSync(join(tmpdir(),'pulsepay-api-test-'));const port=33000+Math.floor(Math.random()*20000);const base=`http://127.0.0.1:${port}`;
- const child=spawn(process.execPath,[entry],{cwd,env:{PATH:process.env.PATH,PORT:String(port),PULSEPAY_APP_URL:base,HEDERA_MERCHANT_ACCOUNT_ID:'0.0.99999',PULSEPAY_API_SECRET:secret,PULSEPAY_DEMO_MODE:String(demo)}});
+ const child=spawn(process.execPath,[entry],{cwd,env:{PATH:process.env.PATH,PORT:String(port),PULSEPAY_APP_URL:base,HEDERA_MERCHANT_ACCOUNT_ID:'0.0.99999',PULSEPAY_API_SECRET:secret,PULSEPAY_DEMO_MODE:String(demo),...extraEnv}});
  let output='';child.stderr.on('data',d=>output+=d);child.stdout.on('data',d=>output+=d);
  t.after(async()=>{if(child.exitCode===null){child.kill();await new Promise(r=>child.once('exit',r));}rmSync(cwd,{recursive:true,force:true});});
  for(let i=0;i<100;i++){if(child.exitCode!==null)throw Error(output);try{await fetch(base);return {base,call:async(path,body,auth=true)=>fetch(base+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(auth?{'x-api-key':secret}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})})};}catch{await new Promise(r=>setTimeout(r,25));}}
  throw Error('Server did not start: '+output);
 }
+test('partial Hedera EVM configuration disables only the optional invoice service',async(t)=>{
+ const {base}=await start(t,false,{HEDERA_EVM_SETTLEMENT_TOKEN_ADDRESS:'0x0000000000000000000000000000000000068cda',HEDERA_EVM_BUYER_ADDRESS:'0x1111111111111111111111111111111111111111'});
+ const manifest=await (await fetch(base+'/.well-known/x402.json')).json();
+ assert.ok(!manifest.services.some(service=>service.id==='agent-invoice-pro'));
+});
 test('merchant authentication, removed routes and unpaid proof handling',async(t)=>{
  const {base,call}=await start(t);
  assert.equal((await call('/api/merchant/state',undefined,false)).status,401);

@@ -14,7 +14,8 @@
   "dependencies": {
     "@pulsepay/shared": "workspace:*",
     "@pulsepay/adapter-hedera": "workspace:*",
-    "@hiero-ledger/sdk": "^2.90.1"
+    "@hiero-ledger/sdk": "^2.90.1",
+    "viem": "^2.57.16"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -198,6 +198,9 @@ importers:
       '@pulsepay/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      viem:
+        specifier: ^2.57.16
+        version: 2.57.16(typescript@5.9.3)(zod@4.6.7)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -349,6 +352,9 @@ importers:
       '@pulsepay/shared':
         specifier: workspace:*
         version: link:../shared
+      viem:
+        specifier: ^2.57.16
+        version: 2.57.16(typescript@5.9.3)(zod@4.6.7)
       zod:
         specifier: ^4.6.7
         version: 4.6.7

@@ -13,7 +13,10 @@ export function publicConfig() {
 		hook: process.env.UNISWAP_TREASURY_HOOK_ADDRESS || "",
 		topic: process.env.HEDERA_AUDIT_TOPIC_ID || "",
 		network: process.env.HEDERA_NETWORK === "mainnet" ? "mainnet" : "testnet",
-		serviceUrl: process.env.PULSEPAY_SERVICE_URL || process.env.PULSEPAY_APP_URL || "http://localhost:3000"
+		serviceUrl: process.env.PULSEPAY_SERVICE_URL || process.env.PULSEPAY_APP_URL || "http://localhost:3000",
+		hederaEvmHub: process.env.HEDERA_EVM_MERCHANT_HUB_ADDRESS || "",
+		hederaEvmToken: process.env.HEDERA_EVM_SETTLEMENT_TOKEN_ADDRESS || "",
+		hederaEvmRpc: process.env.HEDERA_EVM_RPC_URL || "https://testnet.hashio.io/api"
 	};
 }
 

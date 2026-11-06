@@ -1,10 +1,18 @@
 # Hedera implementation and verification
 
+## Hedera EVM invoice and subscription path
+
+The repository now also contains `PulsePayHederaMerchantHub` for chain 296. It uses the HSS system contract at `0x16b` to schedule finite, allowance-backed renewals. Subscriber consent is bounded by maximum cycles, cumulative token spend, and expiry; stale callbacks are invalidated by a generation nonce. Scheduling failures leave the subscription visible and re-armable. Execution HBAR is accounted separately from settlement tokens.
+
+The `hedera-evm-invoice-receipt` API path provisions a unique on-chain invoice before returning 402. The Agent Kit tool verifies chain, trusted hub/token/merchant, payer, amount, due time, and invoice status; its policy reserves a durable token-unit budget before signing. Mirror Node redemption checks the successful call target and payer and decodes every indexed and non-indexed `PaymentSettled` field. Successful responses are persisted, so retrying a settled proof does not purchase again.
+
+This is a custom PulsePay scheme on `eip155:296`, not standard x402 facilitator interoperability. Local mocks prove state transitions and ABI verification, but they do not prove that a particular HTS token is associated correctly or that HSS executed autonomously on testnet. Deployment and live evidence require a funded deployer, a verified token address, and HBAR in the hub; follow [the contract guide](../contracts/hedera/README.md).
+
 The adapter uses the official `@hashgraph/hedera-agent-kit` 4.2 interfaces and `@hiero-ledger/sdk` 2.90. Payment and refund tools extend the real Agent Kit `BaseTool`. The SDK convenience call `tool.execute(params, context)` and the Agent Kit call `tool.execute(client, context, params)` both run the official seven-stage hook pipeline. The plugin binds its supplied context to both tools.
 
 ## Current local workflow
 
-The configuration repair supersedes older local command and replay descriptions below. Use pnpm 12.14.0 and Node >=22.13. `pnpm verify` runs the full workspace, contract and dependency checks; the Hedera adapter now has 22 tests and its HTTP server has seven. Application `start` scripts load the root `.env` automatically. Merchant routes require the configured API secret or a signed login session.
+The configuration repair supersedes older local command and replay descriptions below. Use pnpm 12.14.0 and Node >=22.13. `pnpm verify` runs the full workspace, contract and dependency checks. Application `start` scripts load the root `.env` automatically. Merchant routes require the configured API secret or a signed login session.
 
 Both processes use `PULSEPAY_STATE_DIRECTORY`; production requires an absolute persistent path. Ownership locks reject duplicate server/worker processes. After a crash, check the recorded host/PID before removing a stale lock directory. Responses are saved with redemption, so the same valid proof retrieves the same result on retry without another purchase. The buyer journals its transaction ID before submission and automatically resumes unresolved saved purchases. A different transaction or service cannot reuse the redemption.
 

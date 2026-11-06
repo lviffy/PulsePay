@@ -4,7 +4,7 @@ import {mkdtempSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
-import {handleX402PaymentCheck,getVerifiedHederaPayments} from '../dist/index.js';
+import {handleX402PaymentCheck,getVerifiedHederaPayments,handleEvmInvoicePaymentCheck,getVerifiedEvmInvoicePayments} from '../dist/index.js';
 const payer='0.0.11327364',recipient='0.0.11329845',id=`${payer}-1793911165-521929932`;
 function setup(){
  const statePath=join(mkdtempSync(join(tmpdir(),'pulsepay-http-')),'state.json');
@@ -50,4 +50,33 @@ test('challenge creation prunes expired entries and enforces storage bounds',asy
  assert.equal((await handleX402PaymentCheck(c)).statusCode,429);
  t.mock.timers.tick(301000);const second=await challenge(c);assert.notEqual(first.challengeId,second.challengeId);
  assert.equal((await handleX402PaymentCheck({...c,maxStoredChallenges:1})).statusCode,503);
+});
+
+const evmPayer='0x1111111111111111111111111111111111111111',evmHub='0x2222222222222222222222222222222222222222',evmToken='0x3333333333333333333333333333333333333333',evmMerchant='0x4444444444444444444444444444444444444444';
+function evmSetup(){
+ const statePath=join(mkdtempSync(join(tmpdir(),'pulsepay-evm-http-')),'state.json');let provisions=0,verifications=0;
+ const config={serviceId:'evm-test',serviceName:'EVM Test API',statePath,chainId:296,hubAddress:evmHub,tokenAddress:evmToken,merchantAddress:evmMerchant,payerAddress:evmPayer,amountUnits:'1000000',
+  provisionInvoice:async request=>{provisions++;assert.equal(request.customer,evmPayer);assert.match(request.metadataHash,/^0x[a-f0-9]{64}$/);return {transactionHash:`0x${'aa'.repeat(32)}`};},
+  verifyPayment:async(requirement,transactionHash)=>{verifications++;assert.equal(requirement.invoiceId.length,66);return {transactionHash,paidAt:BigInt(Math.floor(Date.now()/1000))};}};
+ return {config,counts:()=>({provisions,verifications})};
+}
+async function evmChallenge(config){const result=await handleEvmInvoicePaymentCheck(config);assert.equal(result.statusCode,402);return result.body.requirement;}
+test('EVM invoice challenge provisions a unique bound invoice and persists one redemption',async()=>{
+ const setup=evmSetup(),requirement=await evmChallenge(setup.config),tx=`0x${'bb'.repeat(32)}`;
+ setup.config.createResponse=()=>({access:'granted'});
+ const proof=JSON.stringify({challengeId:requirement.challengeId,transactionId:tx});
+ const first=await handleEvmInvoicePaymentCheck(setup.config,proof),retry=await handleEvmInvoicePaymentCheck(setup.config,proof);
+ assert.equal(first.statusCode,200);assert.deepEqual(retry.body,first.body);assert.deepEqual(setup.counts(),{provisions:1,verifications:1});
+ const payments=getVerifiedEvmInvoicePayments(setup.config.statePath);assert.equal(payments.length,1);assert.equal('challengeId' in payments[0],false);
+});
+test('EVM invoice proof fails closed on altered service terms and retries mirror lag',async()=>{
+ const setup=evmSetup(),requirement=await evmChallenge(setup.config),tx=`0x${'cc'.repeat(32)}`,proof=JSON.stringify({challengeId:requirement.challengeId,transactionId:tx});
+ assert.equal((await handleEvmInvoicePaymentCheck({...setup.config,amountUnits:'1000001'},proof)).statusCode,400);
+ let online=false;setup.config.verifyPayment=async()=>{if(!online)throw Error('mirror lag');return {transactionHash:tx,paidAt:BigInt(Math.floor(Date.now()/1000))};};
+ assert.equal((await handleEvmInvoicePaymentCheck(setup.config,proof)).statusCode,503);online=true;
+ assert.equal((await handleEvmInvoicePaymentCheck(setup.config,proof)).statusCode,200);
+});
+test('EVM invoice challenge does not advertise payment if provisioning fails',async()=>{
+ const {config}=evmSetup();config.provisionInvoice=async()=>{throw Error('merchant signer offline')};
+ const result=await handleEvmInvoicePaymentCheck(config);assert.equal(result.statusCode,503);assert.match(result.body.error,/signer offline/);
 });

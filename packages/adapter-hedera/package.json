@@ -15,6 +15,7 @@
     "@hashgraph/hedera-agent-kit": "^4.2.0",
     "@hiero-ledger/sdk": "^2.90.1",
     "@pulsepay/shared": "workspace:*",
+    "viem": "^2.57.16",
     "zod": "^4.6.7"
   },
   "devDependencies": {

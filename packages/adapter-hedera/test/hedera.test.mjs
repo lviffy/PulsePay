@@ -4,7 +4,8 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
-import { AgentMode, X402PayTool, IssueRefundTool, PulsePaySpendLimitPolicy, PulsePayHcsAuditHook, PulsePayHederaPlugin, HederaMirrorClient } from '../dist/index.js';
+import { encodeAbiParameters, encodeEventTopics } from 'viem';
+import { AgentMode, X402PayTool, IssueRefundTool, HederaEvmInvoicePayTool, PulsePaySpendLimitPolicy, PulsePayTokenSpendPolicy, PulsePayHcsAuditHook, PulsePayHederaPlugin, HederaMirrorClient, hederaMerchantHubAbi, verifyHederaInvoicePayment } from '../dist/index.js';
 const require = createRequire(import.meta.url);
 const kit = await import(require.resolve('@hashgraph/hedera-agent-kit').replace('/cjs/index.js', '/esm/index.mjs'));
 const sender='0.0.11327364', merchant='0.0.11329845', id=`${sender}-1793911165-521929932`;
@@ -17,8 +18,25 @@ const refundContext=()=>({...context(),operatorAccountId:merchant,mirror:{transa
 
 test('official Agent Kit registration and execution use real BaseTool subclasses',async()=>{
  const plugin=new PulsePayHederaPlugin();const registry=new kit.PluginRegistry();registry.register(plugin);
- const tools=registry.getTools({});assert.equal(tools.length,2);assert(tools.every(t=>t instanceof kit.BaseTool));
+ const tools=registry.getTools({});assert.equal(tools.length,3);assert(tools.every(t=>t instanceof kit.BaseTool));
  const ctx=context();const result=await tools[0].execute(undefined,ctx,params);assert.equal(result.status,'SETTLED');assert.equal(result.amountHbar,'0.00000001');
+});
+test('Hedera EVM invoice tool validates onchain terms, approves exact amount and pays',async()=>{
+ const payer='0x1111111111111111111111111111111111111111',hub='0x2222222222222222222222222222222222222222',token='0x3333333333333333333333333333333333333333',evmMerchant='0x4444444444444444444444444444444444444444';
+ const invoiceId=`0x${'12'.repeat(32)}`,submitted=[];
+ const evmParams={chainId:296,hubAddress:hub,tokenAddress:token,merchantAddress:evmMerchant,payerAddress:payer,invoiceId,amountUnits:'1000000',challengeId:'ab'.repeat(16)};
+ const publicClient={getChainId:async()=>296,readContract:async request=>request.functionName==='settlementToken'?token:request.functionName==='getInvoice'?[invoiceId,evmMerchant,payer,1000000n,BigInt(Math.floor(Date.now()/1000)+300),1,`0x${'00'.repeat(32)}`]:0n,
+  simulateContract:async request=>({request}),waitForTransactionReceipt:async()=>({status:'success'})};
+ const walletClient={getAddresses:async()=>[payer],writeContract:async request=>{submitted.push(request.functionName);return `0x${String(submitted.length).padStart(64,'0')}`;}};
+ const tool=new HederaEvmInvoicePayTool();tool.registerHook(new PulsePayTokenSpendPolicy({chainId:296,tokenAddress:token,dailyBudgetUnits:2000000n,maxPerRequestUnits:1000000n,hubAllowlist:[hub],merchantAllowlist:[evmMerchant]}));
+ const result=await tool.execute(evmParams,{evmPublicClient:publicClient,evmWalletClient:walletClient});
+ assert.equal(result.status,'SETTLED');assert.deepEqual(submitted,['approve','payInvoice']);
+});
+test('token spend policy blocks altered contract terms before an EVM transaction',async()=>{
+ const payer='0x1111111111111111111111111111111111111111',hub='0x2222222222222222222222222222222222222222',token='0x3333333333333333333333333333333333333333',evmMerchant='0x4444444444444444444444444444444444444444';
+ const base={chainId:296,hubAddress:hub,tokenAddress:token,merchantAddress:evmMerchant,payerAddress:payer,invoiceId:`0x${'12'.repeat(32)}`,amountUnits:'2',challengeId:'ab'.repeat(16)};
+ let reads=0;const tool=new HederaEvmInvoicePayTool();tool.registerHook(new PulsePayTokenSpendPolicy({chainId:296,tokenAddress:token,dailyBudgetUnits:1n,maxPerRequestUnits:1n,hubAllowlist:[hub]}));
+ await assert.rejects(tool.execute(base,{evmPublicClient:{getChainId:async()=>{reads++;return 296}}}),/per-request/);assert.equal(reads,0);
 });
 test('missing configuration fails instead of fabricating settlement',async()=>{
  await assert.rejects(new X402PayTool().execute(params),/operator/);
@@ -85,6 +103,17 @@ test('mirror lookups require a matching successful transaction record',async()=>
  assert.equal((await mirror.transaction(id)).result,'SUCCESS');
  const bad=new HederaMirrorClient('testnet',async()=>new Response(JSON.stringify({transactions:[{...record(),result:'FAIL_INVALID'}]})));
  await assert.rejects(bad.transaction(id),/settled/);
+});
+test('Mirror contract proof decodes and binds every PaymentSettled field',async()=>{
+ const payer='0x1111111111111111111111111111111111111111',hub='0x2222222222222222222222222222222222222222',evmMerchant='0x4444444444444444444444444444444444444444';
+ const invoiceId=`0x${'12'.repeat(32)}`,transactionHash=`0x${'ab'.repeat(32)}`,paidAt=1793911194n;
+ const topics=encodeEventTopics({abi:hederaMerchantHubAbi,eventName:'PaymentSettled',args:{invoiceId,merchant:evmMerchant,customer:payer}});
+ const data=encodeAbiParameters([{type:'uint256'},{type:'uint64'}],[1000000n,paidAt]);
+ const result={status:'SUCCESS',from:payer,to:hub,transaction_hash:transactionHash,logs:[{address:hub,topics,data}]};
+ const mirror=new HederaMirrorClient('testnet',async()=>new Response(JSON.stringify(result)));
+ const verified=await verifyHederaInvoicePayment({mirror,transactionIdOrHash:transactionHash,hubAddress:hub,invoiceId,merchantAddress:evmMerchant,payerAddress:payer,amountUnits:1000000n});
+ assert.deepEqual(verified,{transactionHash,paidAt});
+ await assert.rejects(verifyHederaInvoicePayment({mirror,transactionIdOrHash:transactionHash,hubAddress:hub,invoiceId,merchantAddress:evmMerchant,payerAddress:payer,amountUnits:999999n}),/does not match/);
 });
 test('prepared wallet payments retain budget across restarts and confirm only once',async()=>{
  const statePath=join(temp(),'wallet-budget.json'),config={dailyBudgetTinybars:1n,maxPerRequestTinybars:1n,statePath};

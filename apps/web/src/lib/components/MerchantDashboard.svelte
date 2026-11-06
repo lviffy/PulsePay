@@ -44,6 +44,9 @@
 		topic: string;
 		network: string;
 		serviceUrl: string;
+		hederaEvmHub: string;
+		hederaEvmToken: string;
+		hederaEvmRpc: string;
 	};
 
 	type AuditEntry = {
@@ -122,7 +125,7 @@
 		services: Array<{
 			id: string;
 			name: string;
-			pricing: { amount: string; asset: string; recipient: string; network: string };
+			pricing: { scheme: string; amount: string; asset: string; recipient?: string; payTo?: string; network: string; hub?: string; payer?: string };
 			endpoints: Array<{ path: string; method: string }>;
 		}>;
 	} | null>(null);
@@ -705,7 +708,7 @@
 							<p>
 								<strong>{service.name}</strong><br />
 								<code>
-									{service.id} · {service.pricing.amount} tinybars · {service.pricing.network} · {service.pricing.asset}
+									{service.id} · {service.pricing.amount} {service.pricing.scheme === 'hedera-evm-invoice-receipt' ? 'token units' : 'tinybars'} · {service.pricing.network} · {service.pricing.asset}
 								</code>
 							</p>
 							{#each service.endpoints as endpoint (endpoint.path)}
@@ -715,9 +718,9 @@
 					{/each}
 				{/if}
 				<p>
-					Native HBAR via PulsePay’s hedera-native-receipt extension. The API verifies the payment receipt;
-					HCS records the worker’s audit. Tool and merchant allowlists, transfer caps and durable
-					reservations run inside the worker.
+					Native HBAR uses PulsePay’s hedera-native-receipt extension. Contract invoices use
+					hedera-evm-invoice-receipt on chain 296. Both paths verify settlement before returning the
+					resource; contract-token budgets are separate from tinybar budgets.
 				</p>
 			</div>
 
@@ -822,6 +825,12 @@
 							<dd>{config?.topic || 'Not configured'}</dd>
 							<dt>Service API</dt>
 							<dd>{config?.serviceUrl || 'Reading…'}</dd>
+							<dt>Hedera EVM hub</dt>
+							<dd>{config?.hederaEvmHub || 'Not configured'}</dd>
+							<dt>Hedera settlement token</dt>
+							<dd>{config?.hederaEvmToken || 'Not configured'}</dd>
+							<dt>Hedera EVM RPC</dt>
+							<dd>{config?.hederaEvmRpc || 'Not configured'}</dd>
 						</dl>
 					{/if}
 				</section>

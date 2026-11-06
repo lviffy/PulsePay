@@ -6,7 +6,115 @@ PulsePay combines a Whitechain USDT merchant contract and TypeScript SDK, a Unis
 
 - **Whitechain:** invoices, reserve-backed refunds, subscriptions and balances in `PulsePayMerchantHub.sol`. The SDK provides transaction encoders and direct USDT wallet checkout. Checkout confirms the wallet/RPC network, reads the actual invoice, approves only its amount when needed, and reports success only after a matching settlement event.
 - **Uniswap:** server-side exact-output Trading API quotes with validated addresses, amounts and responses. No simulated fallback is returned. The treasury hook permits exact-input trades in one configured ERC-20 input currency and checks its raw-unit limit. Exact-output trades and other input currencies are rejected.
-- **Hedera:** native HBAR transfers, Agent Kit spending policies, receipt verification, resumable purchases and persistent HCS audit retries. This is PulsePay's `hedera-native-receipt` HTTP-402 extension, not standardized facilitator interoperability.
+- **Hedera:** native HBAR receipt payments plus a chain-296 merchant hub with finite HSS-scheduled subscriptions and challenge-bound EVM invoice payments. The EVM agent validates the live invoice, enforces a durable token budget, approves the exact amount, and the server unlocks the resource only after decoding a matching Mirror Node `PaymentSettled` log. Both HTTP-402 schemes are PulsePay extensions, not standardized facilitator interoperability.
+
+## Hedera hackathon quickstart
+
+This repository is the public-source target for the PulsePay Hedera submission. It contains the setup instructions, architecture, payment flow, local tests, and reproducible testnet evidence required to review the project.
+
+### Architecture
+
+```mermaid
+flowchart LR
+    Agent[AI agent / buyer worker]
+    API[Merchant API]
+    Console[Svelte merchant console]
+    Native[Native HBAR HTTP-402]
+    EVM[Hedera EVM invoice route<br/>chain 296]
+    Hub[PulsePayHederaMerchantHub]
+    HTS[HTS token<br/>0x167]
+    HSS[HSS scheduler<br/>0x16b]
+    Policy[Agent Kit tool<br/>durable spend policy]
+    Mirror[Hedera Mirror Node]
+    HCS[HCS audit topic]
+
+    Agent --> API
+    Console --> API
+    API --> Native
+    API --> EVM
+    EVM --> Hub
+    Hub --> HTS
+    Hub --> HSS
+    Agent --> Policy
+    Policy --> Hub
+    Native --> Mirror
+    EVM --> Mirror
+    Policy --> HCS
+```
+
+### Invoice payment sequence
+
+```mermaid
+sequenceDiagram
+    participant A as Agent worker
+    participant S as Merchant API
+    participant H as Merchant hub
+    participant T as HTS/ERC-20 token
+    participant M as Mirror Node
+
+    A->>S: POST protected resource
+    S->>H: provision challenge-bound invoice
+    H-->>S: InvoiceCreated
+    S-->>A: 402 + invoice, payer, amount, expiry
+    A->>H: read invoice and settlement token
+    A->>T: approve exact amount (if needed)
+    A->>H: payInvoice(invoiceId)
+    H->>T: transferFrom(payer, hub, amount)
+    H-->>A: PaymentSettled event
+    A->>S: retry with transaction proof
+    S->>M: query contract result and logs
+    M-->>S: successful call + PaymentSettled
+    S-->>A: protected resource response
+```
+
+### Autonomous subscription sequence
+
+```mermaid
+sequenceDiagram
+    participant P as Subscriber
+    participant H as Merchant hub
+    participant T as HTS/ERC-20 token
+    participant Q as HSS (0x16b)
+
+    P->>H: createSubscription(maxSpend, expiry)
+    H->>T: transferFrom(first cycle)
+    H->>Q: scheduleCall(next renewal)
+    Note over H,Q: HBAR execution funding is separate from token settlement
+    Q-->>H: executeScheduledRenewal(generation, cycle)
+    H->>T: transferFrom(next cycle)
+    H->>Q: scheduleCall(following cycle)
+    P->>H: cancelSubscription()
+    H->>Q: deleteSchedule()
+    Note over H: generation nonce invalidates stale callbacks even if deletion fails
+```
+
+### Payment flow
+
+1. An agent requests a protected resource and receives HTTP `402` with a challenge bound to the service, payer, merchant, amount, token, invoice ID, and expiry.
+2. The worker validates the challenge against its trusted Hedera configuration and spend policy. For the native route it submits HBAR; for the EVM route it reads the invoice, approves only the required HTS/ERC-20 amount, and calls `payInvoice`.
+3. The server queries Hedera Mirror Node, verifies success, and checks the exact payer, target contract, invoice, merchant, customer, amount, and `PaymentSettled` event.
+4. The verified response is persisted. Retrying the same proof returns the saved response without another payment; an altered or replayed proof is rejected.
+
+### Settled Hedera evidence
+
+The native HBAR payment path has a confirmed Hedera Testnet settlement:
+
+- Transaction ID: `0.0.11327364@1793912134.008842902`
+- Settlement: `1` tinybar to `0.0.11329845`
+- [View the confirmed transaction on HashScan](https://hashscan.io/testnet/transaction/0.0.11327364-1793912134-008842902)
+
+This evidence is for the native `hedera-native-receipt` route. The custom `hedera-evm-invoice-receipt` route is implemented and locally tested, but its live contract deployment remains dependent on a healthy Hedera testnet RPC and funded deployment credentials.
+
+### Run the demo
+
+```bash
+pnpm install --frozen-lockfile --ignore-scripts
+cp .env.example .env
+pnpm build
+pnpm --filter pulsepay-demo-store start
+```
+
+The API serves discovery at `/.well-known/x402.json`; the Svelte merchant console runs on port `3100`. See [Hedera implementation details](docs/HEDERA.md), [the EVM deployment guide](contracts/hedera/README.md), and [the implementation plan](docs/HEDERA_EVM_IMPLEMENTATION_PLAN.md) for configuration and limitations.
 
 The SvelteKit merchant console uses deployed contracts and browser-wallet signing. Simulation dashboards, fixture invoice pages and preview mutation endpoints have been removed. The separate payment API serves sample content behind real Hedera receipt verification; it is not a live market feed. A cross-chain swap cannot currently settle a Whitechain invoice. See [the testing guide](docs/TESTING.md) for observed results and the complete manual test flow.
 
@@ -90,6 +198,8 @@ pnpm --filter pulsepay-agent-worker start
 ```
 
 The buyer journals the payment transaction ID before submission. An unresolved saved purchase is resumed instead of purchasing again. `HEDERA_PAYMENT_TRANSACTION_ID` can select the confirmed transaction for a saved wallet-prepared purchase. A successfully redeemed proof returns the original saved response on retry, including after server restart, without executing another purchase. A different proof cannot reuse that challenge or transaction.
+
+For the Hedera EVM path, set `HEDERA_SERVICE_ID=agent-invoice-pro` and configure the hub, settlement token, merchant signer, buyer signer/address, token-unit caps, and RPC values shown in `.env.example`. The merchant signer provisions a unique invoice before the API advertises its 402 challenge. `HEDERA_EVM_PAYMENT_TRANSACTION_HASH` resumes redemption of an already-submitted payment without paying again. See [the Hedera contract guide](contracts/hedera/README.md) for deployment and HSS funding.
 
 Per-request and daily limits cover transfer amounts. Network and HCS fees have separate transaction caps; these settings do not provide a global wallet fee budget. See [Hedera protocol details and historical live evidence](docs/HEDERA.md).
 

@@ -4,10 +4,12 @@ import { join } from "node:path";
 import { createPulsePay } from "@pulsepay/sdk-core";
 import { config } from "./config.js";
 import { merchantAuth, equalSecret, RequestLimits } from "./security.js";
-import { acquireStateOwner } from "@pulsepay/adapter-hedera";
-import { handleX402PaymentCheck, generateX402Manifest, getVerifiedHederaPayments, formatAccountantCsv } from "@pulsepay/sdk-server";
+import { acquireStateOwner, hederaMerchantHubAbi, hederaTestnet } from "@pulsepay/adapter-hedera";
+import { handleX402PaymentCheck, generateX402Manifest, getVerifiedHederaPayments, handleEvmInvoicePaymentCheck, generateEvmInvoiceManifest, getVerifiedEvmInvoicePayments, formatAccountantCsv } from "@pulsepay/sdk-server";
 import type { NormalizedActivity } from "@pulsepay/shared";
 import { UniswapRoutingAdapter } from "@pulsepay/adapter-uniswap";
+import { createPublicClient, createWalletClient, http as evmHttp, isAddress, type Address, type Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 
 const releaseState = acquireStateOwner(config.stateDirectory, "server");
 for (const signal of ["SIGTERM", "SIGINT"] as const) process.once(signal, () => { releaseState(); process.exit(0); });
@@ -16,7 +18,9 @@ const merchantAccountId = config.merchantAccountId;
 const auth = merchantAuth(config.secret, config.origin);
 const requestLimits = new RequestLimits();
 const paymentStatePath = join(config.stateDirectory, "challenges.json");
+const evmInvoiceStatePath = join(config.stateDirectory, "evm-invoice-challenges.json");
 const verifiedPayments = () => getVerifiedHederaPayments(paymentStatePath);
+const verifiedEvmPayments = () => getVerifiedEvmInvoicePayments(evmInvoiceStatePath);
 const routing = new UniswapRoutingAdapter({ apiKey: process.env.UNISWAP_API_KEY, chainId: Number(process.env.UNISWAP_CHAIN_ID || "1301") });
 const evm = process.env.WHITECHAIN_MERCHANT_HUB_ADDRESS ? createPulsePay({
   whitechain: { contractAddress: process.env.WHITECHAIN_MERCHANT_HUB_ADDRESS as `0x${string}`, rpcUrl: process.env.WHITECHAIN_RPC_URL, usdtAddress: process.env.WHITECHAIN_USDT_ADDRESS as `0x${string}` | undefined },
@@ -52,6 +56,45 @@ const acmeServices = [
     },
   },
 ];
+
+const evmHubAddress = process.env.HEDERA_EVM_MERCHANT_HUB_ADDRESS;
+const evmTokenAddress = process.env.HEDERA_EVM_SETTLEMENT_TOKEN_ADDRESS;
+const evmBuyerAddress = process.env.HEDERA_EVM_BUYER_ADDRESS;
+const evmMerchantKey = (process.env.HEDERA_EVM_MERCHANT_KEY || process.env.PRIVATE_KEY) as Hex | undefined;
+const evmRpcUrl = process.env.HEDERA_EVM_RPC_URL || hederaTestnet.rpcUrls.default.http[0];
+const evmMerchantAccount = evmMerchantKey ? privateKeyToAccount(evmMerchantKey) : undefined;
+for (const [name, value] of Object.entries({
+  HEDERA_EVM_MERCHANT_HUB_ADDRESS: evmHubAddress,
+  HEDERA_EVM_SETTLEMENT_TOKEN_ADDRESS: evmTokenAddress,
+  HEDERA_EVM_BUYER_ADDRESS: evmBuyerAddress,
+  HEDERA_EVM_MERCHANT_ADDRESS: process.env.HEDERA_EVM_MERCHANT_ADDRESS,
+})) if (value && !isAddress(value)) throw new Error(`${name} must be a valid EVM address`);
+if (process.env.HEDERA_EVM_MERCHANT_ADDRESS && evmMerchantAccount?.address.toLowerCase() !== process.env.HEDERA_EVM_MERCHANT_ADDRESS.toLowerCase()) throw new Error("HEDERA_EVM_MERCHANT_ADDRESS does not match the merchant key");
+if (evmMerchantKey && !evmMerchantAccount) throw new Error("Invalid Hedera EVM merchant key");
+const evmPublicClient = evmHubAddress ? createPublicClient({ chain: hederaTestnet, transport: evmHttp(evmRpcUrl) }) : undefined;
+const evmMerchantWallet = evmMerchantAccount ? createWalletClient({ account: evmMerchantAccount, chain: hederaTestnet, transport: evmHttp(evmRpcUrl) }) : undefined;
+const evmInvoiceService = evmHubAddress && evmTokenAddress && evmBuyerAddress && evmMerchantAccount && evmPublicClient && evmMerchantWallet ? {
+  statePath: evmInvoiceStatePath,
+  serviceId: "agent-invoice-pro",
+  serviceName: "Sample Contract Invoice API",
+  chainId: 296 as const,
+  hubAddress: evmHubAddress as Address,
+  tokenAddress: evmTokenAddress as Address,
+  merchantAddress: evmMerchantAccount.address,
+  payerAddress: evmBuyerAddress as Address,
+  amountUnits: process.env.HEDERA_EVM_SERVICE_PRICE_UNITS || "1000000",
+  provisionInvoice: async (invoice: { invoiceId: Hex; customer: Address; amountUnits: string; dueAt: number; metadataHash: Hex }) => {
+    if (await evmPublicClient.getChainId() !== 296) throw new Error("Configured EVM RPC is not Hedera testnet");
+    const configuredToken = await evmPublicClient.readContract({ address: evmHubAddress as Address, abi: hederaMerchantHubAbi, functionName: "settlementToken" });
+    if (configuredToken.toLowerCase() !== evmTokenAddress.toLowerCase()) throw new Error("Configured settlement token does not match the hub");
+    const simulation = await evmPublicClient.simulateContract({ account: evmMerchantAccount, address: evmHubAddress as Address, abi: hederaMerchantHubAbi,
+      functionName: "createInvoice", args: [invoice.invoiceId, invoice.customer, BigInt(invoice.amountUnits), BigInt(invoice.dueAt), invoice.metadataHash] });
+    const transactionHash = await evmMerchantWallet.writeContract(simulation.request);
+    const receipt = await evmPublicClient.waitForTransactionReceipt({ hash: transactionHash });
+    if (receipt.status !== "success") throw new Error("Invoice creation reverted");
+    return { transactionHash };
+  },
+} : undefined;
 
 function parseJsonBody<T>(req: IncomingMessage): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -147,15 +190,18 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       totalAgentCalls: payments.length,
       totalHbarTinybars,
       activities: hederaActivities(),
-      services: generateX402Manifest(acmeServices).services,
+      services: [...generateX402Manifest(acmeServices).services, ...(evmInvoiceService ? [generateEvmInvoiceManifest(evmInvoiceService)] : [])],
+      evmInvoicePayments: verifiedEvmPayments(),
     });
     return;
   }
 
   // Route 1: Machine-readable x402 discovery manifest for autonomous agents
   if (pathname === "/.well-known/x402.json" && req.method === "GET") {
+    const manifest = generateX402Manifest(acmeServices);
+    if (evmInvoiceService) manifest.services.push(generateEvmInvoiceManifest(evmInvoiceService) as any);
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(generateX402Manifest(acmeServices), null, 2));
+    res.end(JSON.stringify(manifest, null, 2));
     return;
   }
 
@@ -176,6 +222,15 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
     res.writeHead(200, check.headers);
     res.end(JSON.stringify(check.body.resourceResponse));
+    return;
+  }
+  if (evmInvoiceService && pathname === `/v1/services/${evmInvoiceService.serviceId}/query` && req.method === "POST") {
+    const check = await handleEvmInvoicePaymentCheck({ ...evmInvoiceService, createResponse: () => ({
+      status: "SUCCESS", service: evmInvoiceService.serviceName, sampleData: true,
+      data: { report: "Hedera EVM invoice payment verified", generatedAt: Date.now() },
+    }) }, req.headers["payment-signature"] as string | undefined);
+    res.writeHead(check.statusCode, check.headers);
+    res.end(JSON.stringify(check.authorized ? check.body.resourceResponse : check.body, null, 2));
     return;
   }
 

@@ -1,3 +1,6 @@
+import { decodeEventLog, isAddress, type Address, type Hex } from "viem";
+import { hederaMerchantHubAbi } from "./hedera-evm.js";
+
 export interface HederaTransactionRecord {
   transaction_id: string;
   result: string;
@@ -7,6 +10,15 @@ export interface HederaTransactionRecord {
   name?: string;
   entity_id?: string | null;
   transfers: { account: string; amount: number | string }[];
+}
+
+export interface HederaContractResult {
+  status: string;
+  from: string;
+  to?: string | null;
+  hash?: string;
+  transaction_hash?: string;
+  logs: { address: string; data: Hex; topics: Hex[] }[];
 }
 
 export function mirrorTransactionId(id: string): string {
@@ -38,6 +50,18 @@ export class HederaMirrorClient {
     }
     throw new Error("Transaction is not indexed yet");
   }
+  async contractResult(idOrHash: string): Promise<HederaContractResult> {
+    const identifier = /^0x[a-fA-F0-9]{64}$/.test(idOrHash) ? idOrHash : mirrorTransactionId(idOrHash);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const response = await this.fetcher(`${this.baseUrl}/api/v1/contracts/results/${encodeURIComponent(identifier)}`, { signal: AbortSignal.timeout(10000) });
+      if (response.status === 404 && attempt < 4) { await new Promise(resolve => setTimeout(resolve, 500)); continue; }
+      if (!response.ok) throw new Error(`Mirror contract-result lookup failed: ${response.status}`);
+      const result = await response.json() as HederaContractResult;
+      if (result.status !== "SUCCESS") throw new Error("Contract transaction has not settled successfully");
+      return result;
+    }
+    throw new Error("Contract transaction is not indexed yet");
+  }
   async topic(id: string): Promise<any> {
     if (!/^\d+\.\d+\.\d+$/.test(id)) throw new Error("Invalid topic ID");
     const response = await this.fetcher(`${this.baseUrl}/api/v1/topics/${id}`, { signal: AbortSignal.timeout(10000) });
@@ -53,6 +77,36 @@ export class HederaMirrorClient {
     const data = await response.json() as { messages: { message: string }[] };
     return data.messages.some(item => item.message === Buffer.from(message).toString("base64"));
   }
+}
+
+export async function verifyHederaInvoicePayment(input: {
+  mirror: HederaMirrorClient;
+  transactionIdOrHash: string;
+  hubAddress: string;
+  invoiceId: string;
+  merchantAddress: string;
+  payerAddress: string;
+  amountUnits: bigint;
+}): Promise<{ transactionHash: string; paidAt: bigint }> {
+  if (![input.hubAddress, input.merchantAddress, input.payerAddress].every(value => isAddress(value)) || !/^0x[a-fA-F0-9]{64}$/.test(input.invoiceId)) throw new Error("Invalid invoice verification terms");
+  const result = await input.mirror.contractResult(input.transactionIdOrHash);
+  if (!result.to || result.to.toLowerCase() !== input.hubAddress.toLowerCase()) throw new Error("Payment called an untrusted contract");
+  if (result.from.toLowerCase() !== input.payerAddress.toLowerCase()) throw new Error("Payment was submitted by another payer");
+  for (const log of result.logs || []) {
+    if (log.address.toLowerCase() !== input.hubAddress.toLowerCase()) continue;
+    if (!log.topics.length) continue;
+    try {
+      const decoded = decodeEventLog({ abi: hederaMerchantHubAbi, eventName: "PaymentSettled", data: log.data, topics: log.topics as [Hex, ...Hex[]] });
+      const args = decoded.args as { invoiceId: Hex; merchant: Address; customer: Address; amount: bigint; paidAt: bigint };
+      if (args.invoiceId.toLowerCase() === input.invoiceId.toLowerCase()
+        && args.merchant.toLowerCase() === input.merchantAddress.toLowerCase()
+        && args.customer.toLowerCase() === input.payerAddress.toLowerCase()
+        && args.amount === input.amountUnits) {
+        return { transactionHash: result.transaction_hash || result.hash || input.transactionIdOrHash, paidAt: args.paidAt };
+      }
+    } catch { /* Ignore unrelated logs. */ }
+  }
+  throw new Error("PaymentSettled event does not match the invoice challenge");
 }
 
 export function transferCredit(record: HederaTransactionRecord, account: string): bigint {

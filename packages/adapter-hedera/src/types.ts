@@ -18,6 +18,9 @@ export interface HederaContext extends Context {
   executionId?: object;
   submissionStarted?: boolean;
   onPaymentPrepared?: (transactionId: string) => void;
+  evmPublicClient?: any;
+  evmWalletClient?: any;
+  onEvmTransactionSubmitted?: (transactionHash: string, kind: "approval" | "payment") => void;
 }
 
 /** Accept both the SDK API and the official Agent Kit (client, context, params) call. */
