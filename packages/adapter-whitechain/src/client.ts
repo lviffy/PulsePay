@@ -4,7 +4,6 @@ import {
   PublicClient,
   WalletClient,
   parseUnits,
-  formatUnits,
   encodeFunctionData,
   decodeEventLog,
 } from "viem";
@@ -34,6 +33,7 @@ export class WhitechainAdapter {
   public readonly usdtAddress: `0x${string}`;
 
   constructor(config: WhitechainClientConfig) {
+    if (!/^0x[a-fA-F0-9]{40}$/.test(config.contractAddress) || /^0x0{40}$/i.test(config.contractAddress)) throw new Error("Configure a nonzero Whitechain merchant hub address");
     this.contractAddress = config.contractAddress;
     this.usdtAddress = config.usdtAddress || WHITECHAIN_USDT_ADDRESS;
     this.walletClient = config.walletClient;
@@ -47,6 +47,40 @@ export class WhitechainAdapter {
   }
 
   // --- Read Methods ---
+
+  /** The caller invokes this from a wallet-confirmed checkout action. Never simulates settlement. */
+  async payInvoice(invoiceId: `0x${string}`): Promise<`0x${string}`> {
+    if (!/^0x[a-fA-F0-9]{64}$/.test(invoiceId)) throw new Error("Invoice ID must be a bytes32 hex value");
+    const wallet = this.walletClient;
+    if (!wallet) throw new Error("Connect a wallet before paying");
+    if (await wallet.getChainId() !== whitechainSepolia.id || await this.publicClient.getChainId() !== whitechainSepolia.id) throw new Error("Wallet and RPC must both use Whitechain Sepolia (1874)");
+    const account = wallet.account || (await wallet.getAddresses())[0];
+    if (!account) throw new Error("Connect and authorize a wallet account before paying");
+    const payer = typeof account === "string" ? account : account.address;
+    const invoice = await this.getInvoice(invoiceId);
+    if (!invoice || invoice.status !== "OPEN" || invoice.dueAt < Date.now()/1000) throw new Error("Invoice is missing, expired or already paid");
+    if (invoice.customer && invoice.customer.toLowerCase() !== payer.toLowerCase()) throw new Error("Invoice belongs to another customer");
+    const token = await this.publicClient.readContract({ address: this.contractAddress, abi: pulsePayMerchantHubAbi, functionName: "USDT" });
+    if (token.toLowerCase() !== this.usdtAddress.toLowerCase()) throw new Error("Merchant hub settlement token does not match configuration");
+    if (await this.getUsdtAllowance(payer) < invoice.amountUnits) {
+      const hash = await wallet.sendTransaction({ account, chain: whitechainSepolia, ...this.encodeApproveUsdt(invoice.amountUnits) });
+      const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") throw new Error("USDT approval reverted");
+    }
+    const hash = await wallet.sendTransaction({ account, chain: whitechainSepolia, ...this.encodePayInvoice(invoiceId) });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") throw new Error(`Payment reverted: ${hash}`);
+    const settled = receipt.logs.some(log => {
+      if (log.address.toLowerCase() !== this.contractAddress.toLowerCase()) return false;
+      try {
+        const event = decodeEventLog({ abi: pulsePayMerchantHubAbi, data: log.data, topics: log.topics });
+        return event.eventName === "PaymentSettled" && event.args.invoiceId === invoiceId
+          && event.args.customer.toLowerCase() === payer.toLowerCase() && event.args.amount === invoice.amountUnits;
+      } catch { return false; }
+    });
+    if (!settled) throw new Error(`Payment receipt has no matching settlement event: ${hash}`);
+    return receipt.transactionHash;
+  }
 
   async getInvoice(invoiceId: `0x${string}`): Promise<Invoice | null> {
     const data = await this.publicClient.readContract({

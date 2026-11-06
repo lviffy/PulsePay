@@ -144,3 +144,14 @@ test('lost audit acknowledgment is reconciled without a second paid submission',
  const recovered=await audit.retryPending({...ctx,mirror:{transaction:async()=>({...record(),transaction_id:entry.transactionId,name:'CONSENSUSSUBMITMESSAGE'}),verifyTopicMessage:async()=>true}});
  assert.equal(recovered[0].status,'CONFIRMED');assert.equal(submissions,1);
 });
+test('file-backed state rejects a second owner and releases on orderly shutdown',async()=>{
+ const {acquireStateOwner}=await import('../dist/index.js');const directory=temp();
+ const release=acquireStateOwner(directory,'worker');assert.throws(()=>acquireStateOwner(directory,'worker'),/already owned/);
+ release();acquireStateOwner(directory,'worker')();
+});
+test('payment journal is written before submission and journal failure prevents spending',async()=>{
+ let prepared=false,submitted=0;
+ const ctx={...context(),onPaymentPrepared:id=>{assert.match(id,/^0\.0\.11327364@/);prepared=true;},submitTransaction:async()=>{assert.equal(prepared,true);submitted++;return {transactionId:id,consensusStatus:'SUCCESS'};}};
+ await new X402PayTool().execute(params,ctx);assert.equal(submitted,1);
+ await assert.rejects(new X402PayTool().execute(params,{...ctx,onPaymentPrepared:()=>{throw Error('disk full');}}),/disk full/);assert.equal(submitted,1);
+});

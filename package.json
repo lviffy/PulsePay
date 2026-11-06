@@ -5,15 +5,18 @@
   "description": "PulsePay: The unified onchain payment & treasury stack for businesses, human customers, and AI agents",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "build:hedera": "bun run --cwd packages/shared build && bun run --cwd packages/adapter-hedera build && bun run --cwd packages/sdk-server build && bun run --cwd apps/agent-worker build && bun run --cwd apps/demo-store build",
-    "test:hedera": "bun run build:hedera && bun run --cwd packages/adapter-hedera test && bun run --cwd packages/sdk-server test",
-    "contracts:whitechain:build": "cd contracts/whitechain && ../../.bin/forge build",
-    "contracts:whitechain:test": "cd contracts/whitechain && ../../.bin/forge test",
-    "contracts:uniswap:build": "cd contracts/uniswap-v4 && ../../.bin/forge build",
-    "contracts:uniswap:test": "cd contracts/uniswap-v4 && ../../.bin/forge test"
+    "dev": "pnpm build && node scripts/dev.mjs",
+    "lint": "turbo run lint && eslint scripts eslint.config.mjs",
+    "test": "pnpm test:unit && pnpm test:contracts",
+    "build:hedera": "pnpm build",
+    "test:hedera": "pnpm build && pnpm --filter @pulsepay/adapter-hedera test && pnpm --filter @pulsepay/sdk-server test",
+    "contracts:whitechain:build": "node scripts/forge.mjs whitechain build",
+    "contracts:whitechain:test": "node scripts/forge.mjs whitechain test",
+    "contracts:uniswap:build": "node scripts/forge.mjs uniswap-v4 build",
+    "contracts:uniswap:test": "node scripts/forge.mjs uniswap-v4 test",
+    "test:unit": "turbo run test",
+    "test:contracts": "pnpm contracts:whitechain:test && pnpm contracts:uniswap:test",
+    "verify": "pnpm lint && pnpm build && pnpm test && pnpm audit --audit-level=high"
   },
   "keywords": [
     "pulsepay",
@@ -28,11 +31,16 @@
   "license": "MIT",
   "devDependencies": {
     "turbo": "^2.4.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "eslint": "^9.39.0",
+    "typescript-eslint": "^8.46.0"
   },
   "packageManager": "pnpm@12.14.0",
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  }
 }

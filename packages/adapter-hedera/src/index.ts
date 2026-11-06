@@ -7,4 +7,5 @@ export * from "./plugin.js";
 export * from "./mirror.js";
 export * from "./transactions.js";
 export * from "./audit-topic.js";
+export * from "./storage/owner.js";
 

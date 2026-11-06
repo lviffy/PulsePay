@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { TransferTransaction, Hbar } from "@hiero-ledger/sdk";
+import { TransferTransaction, Hbar, TransactionId } from "@hiero-ledger/sdk";
 import { BaseTool, HederaContext } from "../types.js";
 import { amountTinybarsSchema, formatHbar, operator, submit } from "../transactions.js";
 
@@ -31,6 +31,8 @@ export class X402PayTool extends BaseTool {
     return { params, tx };
   }
   async secondaryAction({params, tx}: Awaited<ReturnType<X402PayTool["coreAction"]>>, _client: unknown, context: HederaContext) {
+    if (!tx.transactionId) tx.setTransactionId(TransactionId.generate(operator(context)));
+    context.onPaymentPrepared?.(tx.transactionId!.toString());
     const result = await submit(tx, context);
     return { ...result, status: result.status === "PREPARED" ? "PREPARED" : "SETTLED", serviceId: params.serviceId,
       merchantAccountId: params.merchantAccountId, amountTinybars: params.amountTinybars.toString(), amountHbar: formatHbar(params.amountTinybars),

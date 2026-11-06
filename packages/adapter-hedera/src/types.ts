@@ -17,6 +17,7 @@ export interface HederaContext extends Context {
   submitTransaction?: (tx: Transaction) => Promise<{ transactionId: string; consensusStatus: string }>;
   executionId?: object;
   submissionStarted?: boolean;
+  onPaymentPrepared?: (transactionId: string) => void;
 }
 
 /** Accept both the SDK API and the official Agent Kit (client, context, params) call. */

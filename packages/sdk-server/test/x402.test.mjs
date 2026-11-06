@@ -17,9 +17,12 @@ const proof=c=>JSON.stringify({challengeId:c.challengeId,transactionId:id});
 test('unpaid challenge and invalid header fail closed',async()=>{
  const c=setup();await challenge(c);for(const header of ['not-a-payment','{}','{"challengeId":"fake"}']) assert.equal((await handleX402PaymentCheck(c,header)).authorized,false);
 });
-test('verified receipt unlocks once; replay stays blocked after server state reload',async()=>{
+test('verified receipt retry returns the saved result without another purchase',async()=>{
  const c=setup(),r=await challenge(c);c.mirror={network:'testnet',transaction:async()=>record(r)};
- assert.equal((await handleX402PaymentCheck(c,proof(r))).statusCode,200);assert.equal((await handleX402PaymentCheck({...c},proof(r))).statusCode,409);assert.equal(getVerifiedHederaPayments(c.statePath).length,1);assert.equal('challengeId' in getVerifiedHederaPayments(c.statePath)[0],false);
+ let executions=0;c.createResponse=()=>({sequence:++executions});
+ const first=await handleX402PaymentCheck(c,proof(r));
+ const retry=await handleX402PaymentCheck({...c},proof(r));
+ assert.equal(first.statusCode,200);assert.equal(retry.statusCode,200);assert.deepEqual(retry.body,first.body);assert.equal(executions,1);assert.equal(getVerifiedHederaPayments(c.statePath).length,1);assert.equal('challengeId' in getVerifiedHederaPayments(c.statePath)[0],false);
 });
 test('wrong amount, recipient, memo, service and network are rejected',async()=>{
  for(const change of [{transfers:[{account:payer,amount:-2},{account:recipient,amount:2}]},{transfers:[{account:payer,amount:-2},{account:'0.0.999',amount:1}]},{memo_base64:Buffer.from('unbound').toString('base64')},{consensus_timestamp:'1'}]){
@@ -32,11 +35,19 @@ test('wrong amount, recipient, memo, service and network are rejected',async()=>
 test('expired challenges are rejected without lookup',async(t)=>{
  t.mock.timers.enable({apis:['Date'],now:new Date()});const c=setup(),r=await challenge(c);t.mock.timers.tick(301000);assert.equal((await handleX402PaymentCheck(c,proof(r))).statusCode,402);
 });
-test('concurrent replay grants only one request',async()=>{
+test('concurrent retries return one persisted execution',async()=>{
  const c=setup(),r=await challenge(c);c.mirror={network:'testnet',transaction:async()=>{await new Promise(r=>setTimeout(r,5));return record(r)}};
- const results=await Promise.all([handleX402PaymentCheck(c,proof(r)),handleX402PaymentCheck(c,proof(r))]);assert.deepEqual(results.map(r=>r.statusCode).sort(),[200,409]);
+ let executions=0;c.createResponse=()=>({sequence:++executions});
+ const results=await Promise.all([handleX402PaymentCheck(c,proof(r)),handleX402PaymentCheck(c,proof(r))]);assert.deepEqual(results.map(r=>r.statusCode),[200,200]);assert.deepEqual(results[0].body,results[1].body);assert.equal(executions,1);
 });
 test('mirror outage preserves proof for retry instead of charging again',async()=>{
  const c=setup(),r=await challenge(c);c.mirror={network:'testnet',transaction:async()=>{throw Error('offline')}};assert.equal((await handleX402PaymentCheck(c,proof(r))).statusCode,503);
  c.mirror.transaction=async()=>record(r);assert.equal((await handleX402PaymentCheck(c,proof(r))).statusCode,200);
+});
+test('challenge creation prunes expired entries and enforces storage bounds',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:new Date()});
+ const c={...setup(),maxPendingChallenges:1};const first=await challenge(c);
+ assert.equal((await handleX402PaymentCheck(c)).statusCode,429);
+ t.mock.timers.tick(301000);const second=await challenge(c);assert.notEqual(first.challengeId,second.challengeId);
+ assert.equal((await handleX402PaymentCheck({...c,maxStoredChallenges:1})).statusCode,503);
 });

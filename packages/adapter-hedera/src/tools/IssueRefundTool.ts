@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TransferTransaction, Hbar } from "@hiero-ledger/sdk";
 import { join } from "node:path";
-import { BaseTool, HederaContext, AgentMode } from "../types.js";
+import { BaseTool, HederaContext } from "../types.js";
 import { amountTinybarsSchema, formatHbar, operator, submit } from "../transactions.js";
 import { HederaMirrorClient, mirrorTransactionId, transferCredit } from "../mirror.js";
 import { readJson, writeJson } from "../storage/json.js";

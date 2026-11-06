@@ -2,13 +2,21 @@
 
 The adapter uses the official `@hashgraph/hedera-agent-kit` 4.2 interfaces and `@hiero-ledger/sdk` 2.90. Payment and refund tools extend the real Agent Kit `BaseTool`. The SDK convenience call `tool.execute(params, context)` and the Agent Kit call `tool.execute(client, context, params)` both run the official seven-stage hook pipeline. The plugin binds its supplied context to both tools.
 
+## Current local workflow
+
+The configuration repair supersedes older local command and replay descriptions below. Use pnpm 12.14.0 and Node >=22.13. `pnpm verify` runs the full workspace, contract and dependency checks; the Hedera adapter now has 22 tests and its HTTP server has seven. Application `start` scripts load the root `.env` automatically. Merchant routes require the configured API secret or a signed login session.
+
+Both processes use `PULSEPAY_STATE_DIRECTORY`; production requires an absolute persistent path. Ownership locks reject duplicate server/worker processes. After a crash, check the recorded host/PID before removing a stale lock directory. Responses are saved with redemption, so the same valid proof retrieves the same result on retry without another purchase. The buyer journals its transaction ID before submission and automatically resumes unresolved saved purchases. A different transaction or service cannot reuse the redemption.
+
+Historical testnet evidence below was not re-executed during this repair. No further paid transactions were submitted.
+
 ## Supported flow
 
 1. The buyer fetches the service manifest and receives a real HTTP 402 challenge.
 2. The buyer validates network, native HBAR asset, recipient, expiry and its spending limits.
 3. A native transfer binds the payment to a secret challenge through its hash in the public memo.
 4. With an SDK operator key, the worker executes automatically. Without a key, it returns unsigned bytes with `AWAITING_WALLET`; it never claims settlement.
-5. After consensus, the API checks the mirror-node transaction result, recipient, exact amount, payer debit, memo and consensus time. It persists redemption and rejects a second use with 409. A temporarily unavailable mirror returns 503 and instructs the buyer to retry the saved proof instead of paying again.
+5. After consensus, the API checks the mirror-node transaction result, recipient, exact amount, payer debit, memo and consensus time. It persists redemption with the purchased response. The identical proof returns that response on retry; a conflicting proof is rejected with 409. A temporarily unavailable mirror returns 503 and instructs the buyer to retry the saved proof instead of paying again.
 6. Confirmed payments appear at `/api/hedera/payments`, `/merchant`, `/receipt/hedera/<transactionId>` and in the accountant CSV.
 7. The HCS hook saves a pending record before submission. Successful payment remains settled when HCS is unavailable; its separate audit result says `PENDING` with an error. `retryPending(context)` retries the saved record without resending the payment.
 8. Refunds verify the original successful PulsePay payment, paying merchant, original buyer and remaining refundable amount. Durable reservations block concurrent or ambiguous duplicate refunds. A wallet-prepared refund is finalized through `IssueRefundTool.confirmRefund` after independent mirror verification.
@@ -17,22 +25,9 @@ Protocol scope: `hedera-native-receipt` is PulsePay's explicit native receipt ex
 
 ## Local checks
 
-From the repository root, `bun run test:hedera` builds every Hedera caller and runs both regression suites without requiring pnpm.
+From the repository root, `pnpm test:hedera` builds the workspace and runs the adapter and server suites. `pnpm verify` also covers the EVM SDK, quote adapter, merchant HTTP routes and both Solidity projects. All local submitters use mocks or return unsigned bytes; these test commands never broadcast payment transactions.
 
-Build `shared`, `adapter-hedera`, `sdk-server` and the two apps in dependency order using their `build` scripts. Other packages also compile. The root Turbo command requires the pnpm binary configured in the root manifest; Bun alone does not satisfy that requirement.
-
-```bash
-cd packages/adapter-hedera
-bun run build
-bun run test
-cd ../sdk-server
-bun run build
-bun run test
-```
-
-There are 20 adapter regression tests and 6 API regression tests. They cover official plugin registration, missing-client failure, positive int64 amounts, request/recipient/daily limits, concurrent spending, persisted budgets, prepared wallet reservations, definite failures versus ambiguous submissions, refunds and durable refund reservations, HCS retry, forged proofs, wrong amounts/recipients/memos/networks/services, expiry, persistent replay protection and concurrent replay.
-
-The two older TypeScript test entry points delegate to the maintained `.mjs` suite.
+The older TypeScript entry points delegate to the maintained `.mjs` suite.
 
 ## Configuration
 

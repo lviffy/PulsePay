@@ -7,7 +7,6 @@ import {
   parseAbi,
 } from "viem";
 import {
-  UNICHAIN_SEPOLIA_CHAIN_ID,
   UNICHAIN_SEPOLIA_RPC,
   UNICHAIN_SEPOLIA_POOL_MANAGER,
 } from "@pulsepay/shared";
@@ -16,6 +15,7 @@ export const treasuryGuardHookAbi = parseAbi([
   "function maxSwapAmount() view returns (uint256)",
   "function paused() view returns (bool)",
   "function owner() view returns (address)",
+  "function limitCurrency() view returns (address)",
   "function setPaused(bool _paused)",
   "function setMaxSwapAmount(uint256 _newLimit)",
   "event TreasurySwapsPausedUpdated(bool isPaused)",
@@ -49,8 +49,8 @@ export class UniswapV4TreasuryAdapter {
       });
   }
 
-  async getHookPolicy(): Promise<{ maxSwapAmount: bigint; paused: boolean; owner: `0x${string}` }> {
-    const [maxSwapAmount, paused, owner] = await Promise.all([
+  async getHookPolicy(): Promise<{ maxSwapAmount: bigint; paused: boolean; owner: `0x${string}`; limitCurrency: `0x${string}` }> {
+    const [maxSwapAmount, paused, owner, limitCurrency] = await Promise.all([
       this.publicClient.readContract({
         address: this.hookAddress,
         abi: treasuryGuardHookAbi,
@@ -66,9 +66,10 @@ export class UniswapV4TreasuryAdapter {
         abi: treasuryGuardHookAbi,
         functionName: "owner",
       }),
+      this.publicClient.readContract({ address: this.hookAddress, abi: treasuryGuardHookAbi, functionName: "limitCurrency" }),
     ]);
 
-    return { maxSwapAmount, paused, owner };
+    return { maxSwapAmount, paused, owner, limitCurrency };
   }
 
   encodeSetPaused(paused: boolean) {

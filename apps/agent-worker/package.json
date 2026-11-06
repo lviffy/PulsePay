@@ -5,9 +5,11 @@
   "main": "./dist/index.js",
   "type": "module",
   "scripts": {
-    "start": "node dist/index.js",
+    "start": "node ../../scripts/run-app.mjs agent-worker",
     "build": "tsc",
-    "run:agent": "node dist/index.js"
+    "run:agent": "node ../../scripts/run-app.mjs agent-worker",
+    "lint": "eslint src",
+    "dev": "node ../../scripts/run-app.mjs agent-worker --watch"
   },
   "dependencies": {
     "@pulsepay/shared": "workspace:*",
@@ -19,4 +21,3 @@
     "typescript": "^5.7.3"
   }
 }
-

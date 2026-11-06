@@ -1,4 +1,4 @@
-import { NormalizedActivity, formatAccountantCsv } from "@pulsepay/shared";
+import { formatAccountantCsv } from "@pulsepay/shared";
 
 export { formatAccountantCsv };
 

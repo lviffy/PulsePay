@@ -1,9 +1,15 @@
 import { Client } from "@hiero-ledger/sdk";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { AgentMode, HederaMirrorClient, PulsePaySpendLimitPolicy, PulsePayHcsAuditHook, X402PayTool, transferCredit, getConfiguredAuditTopic } from "@pulsepay/adapter-hedera";
+import { join, resolve, isAbsolute } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from "node:fs";
+import { AgentMode, HederaMirrorClient, PulsePaySpendLimitPolicy, PulsePayHcsAuditHook, X402PayTool, transferCredit, getConfiguredAuditTopic, acquireStateOwner } from "@pulsepay/adapter-hedera";
 import type { HederaContext } from "@pulsepay/adapter-hedera";
 
 async function runAutonomousBuyerAgent() {
+  const configuredDirectory = process.env.PULSEPAY_STATE_DIRECTORY;
+  if (process.env.NODE_ENV === "production" && (!configuredDirectory || !isAbsolute(configuredDirectory))) throw new Error("Production requires an absolute PULSEPAY_STATE_DIRECTORY on persistent storage");
+  const storageDirectory = resolve(configuredDirectory || ".pulsepay");
+  const releaseState = acquireStateOwner(storageDirectory, "worker");
+  for (const signal of ["SIGTERM", "SIGINT"] as const) process.once(signal, () => { releaseState(); process.exit(0); });
   const base = process.env.PULSEPAY_APP_URL || "http://localhost:3000";
   const operatorId = process.env.HEDERA_BUYER_ACCOUNT_ID || process.env.HEDERA_OPERATOR_ID;
   if (!operatorId) throw new Error("Configure HEDERA_BUYER_ACCOUNT_ID (or HEDERA_OPERATOR_ID). No simulated settlement is available.");
@@ -13,19 +19,21 @@ async function runAutonomousBuyerAgent() {
   const network = process.env.HEDERA_NETWORK || "testnet";
   if (network !== "testnet" && network !== "mainnet") throw new Error("Unsupported Hedera network");
   const mirror = new HederaMirrorClient(network);
-  const context: HederaContext = { operatorAccountId: operatorId, network, mirror,
+  const context: HederaContext = { storageDirectory, operatorAccountId: operatorId, network, mirror,
     maxTransactionFeeTinybars: BigInt(process.env.HEDERA_MAX_FEE_TINYBARS || "1000000"), auditTopicId: process.env.HEDERA_AUDIT_TOPIC_ID };
   context.auditTopicId ||= getConfiguredAuditTopic(context);
   const client = key ? (network === "testnet" ? Client.forTestnet() : Client.forMainnet()) : undefined;
   if (client) { client.setOperator(operatorId, key!); client.setMaxAttempts(1); context.client = client; }
-  const pendingPath = ".pulsepay/buyer-pending.json";
+  const pendingPath = join(storageDirectory, "buyer-pending.json");
   try {
     let requirement: any;
-    let transactionId = process.env.HEDERA_PAYMENT_TRANSACTION_ID;
+    const saved = existsSync(pendingPath) ? JSON.parse(readFileSync(pendingPath, "utf8")) : undefined;
+    let transactionId = process.env.HEDERA_PAYMENT_TRANSACTION_ID || (!saved?.completed ? saved?.transactionId : undefined);
     let endpoint: string;
     if (transactionId) {
       const pending = JSON.parse(readFileSync(pendingPath, "utf8"));
       requirement = pending.requirement; endpoint = pending.endpoint;
+      if (new URL(endpoint).origin !== new URL(base).origin) throw new Error("Saved endpoint changed origin");
     } else {
       const manifestResponse = await fetch(new URL("/.well-known/x402.json", base), { signal: AbortSignal.timeout(10000) });
       if (!manifestResponse.ok) throw new Error(`Discovery failed: ${manifestResponse.status}`);
@@ -39,9 +47,9 @@ async function runAutonomousBuyerAgent() {
       requirement = JSON.parse(challenge.headers.get("payment-required") || "null");
     }
     if (!requirement || requirement.scheme !== "hedera-native-receipt" || requirement.network !== `hedera:${network}` || requirement.asset !== "0.0.0"
-      || requirement.recipient !== recipient || requirement.expiresAt < Date.now()/1000 || !/^[a-f0-9]{32}$/.test(requirement.challengeId)) throw new Error("Unsupported, expired or untrusted payment challenge");
+      || requirement.recipient !== recipient || (!transactionId && requirement.expiresAt < Date.now()/1000) || !/^[a-f0-9]{32}$/.test(requirement.challengeId)) throw new Error("Unsupported, expired or untrusted payment challenge");
     const policy = new PulsePaySpendLimitPolicy({ dailyBudgetTinybars: BigInt(process.env.HEDERA_DAILY_BUDGET_TINYBARS || "10"),
-      maxPerRequestTinybars: BigInt(process.env.HEDERA_MAX_PAYMENT_TINYBARS || "1"), merchantAllowlist: [recipient], statePath: ".pulsepay/spend-policy.json" });
+      maxPerRequestTinybars: BigInt(process.env.HEDERA_MAX_PAYMENT_TINYBARS || "1"), merchantAllowlist: [recipient], statePath: join(storageDirectory, "spend-policy.json") });
     const audit = new PulsePayHcsAuditHook({ topicId: context.auditTopicId,
       maxTransactionFeeTinybars: BigInt(process.env.HEDERA_AUDIT_MAX_FEE_TINYBARS || "2000000") });
     let settlement: any;
@@ -49,10 +57,16 @@ async function runAutonomousBuyerAgent() {
       const tool = new X402PayTool(); tool.registerHook(policy);
       tool.registerHook(audit);
       if (!client) context.mode = AgentMode.RETURN_BYTES;
+      context.onPaymentPrepared = transactionId => {
+        mkdirSync(storageDirectory, { recursive: true, mode: 0o700 });
+        writeFileSync(`${pendingPath}.tmp`, JSON.stringify({ requirement, endpoint, transactionId, completed: false }), { mode: 0o600 });
+        renameSync(`${pendingPath}.tmp`, pendingPath);
+      };
       settlement = await tool.execute({ serviceId: requirement.serviceId, merchantAccountId: recipient, amountTinybars: requirement.amount, challengeId: requirement.challengeId }, context);
       transactionId = settlement.transactionId;
-      mkdirSync(".pulsepay", { recursive: true, mode: 0o700 });
-      writeFileSync(pendingPath, JSON.stringify({ requirement, endpoint, transactionId }), { mode: 0o600 });
+      mkdirSync(storageDirectory, { recursive: true, mode: 0o700 });
+      writeFileSync(`${pendingPath}.tmp`, JSON.stringify({ requirement, endpoint, transactionId, completed: false }), { mode: 0o600 });
+      renameSync(`${pendingPath}.tmp`, pendingPath);
       if (settlement.status === "PREPARED") {
         console.log(JSON.stringify({ ...settlement, status: "AWAITING_WALLET", nextStep: "Submit bytes using your wallet, then rerun with HEDERA_PAYMENT_TRANSACTION_ID. Do not pay twice." }, null, 2));
         return;
@@ -67,7 +81,10 @@ async function runAutonomousBuyerAgent() {
       settlement = { status: "SETTLED", transactionId, consensusStatus: "SUCCESS", merchantAccountId: recipient, amountTinybars: requirement.amount };
       await audit.postToolExecutionHook({ context, toolResult: settlement } as any, "x402_pay_tool");
     }
-    console.log(JSON.stringify({ settlement, data: await response.json() }, null, 2));
-  } finally { client?.close(); }
+    const data = await response.json();
+    writeFileSync(`${pendingPath}.tmp`, JSON.stringify({ requirement, endpoint, transactionId, completed: true }), { mode: 0o600 });
+    renameSync(`${pendingPath}.tmp`, pendingPath);
+    console.log(JSON.stringify({ settlement, data }, null, 2));
+  } finally { client?.close(); releaseState(); }
 }
 runAutonomousBuyerAgent().catch(error => { console.error(error.message); process.exitCode = 1; });

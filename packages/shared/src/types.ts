@@ -49,6 +49,7 @@ export interface Subscription {
 }
 
 export interface SwapQuote {
+  chainId?: number;
   inputToken: string;
   inputAmount: string;
   outputToken: string;

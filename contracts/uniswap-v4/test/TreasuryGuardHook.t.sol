@@ -30,7 +30,7 @@ contract TreasuryGuardHookTest is Test {
 
         bytes memory creationCode = abi.encodePacked(
             type(TreasuryGuardHook).creationCode,
-            abi.encode(poolManager, INITIAL_MAX_SWAP, treasuryOwner)
+            abi.encode(poolManager, INITIAL_MAX_SWAP, treasuryOwner, makeAddr("token0"))
         );
 
         (address hookAddress, bytes32 salt) = HookMiner.find(address(this), flags, creationCode);
@@ -38,7 +38,8 @@ contract TreasuryGuardHookTest is Test {
         hook = new TreasuryGuardHook{salt: salt}(
             poolManager,
             INITIAL_MAX_SWAP,
-            treasuryOwner
+            treasuryOwner,
+            makeAddr("token0")
         );
 
         require(address(hook) == hookAddress, "Hook address mismatch");
@@ -192,4 +193,16 @@ contract TreasuryGuardHookTest is Test {
         assertEq(selector, IHooks.afterSwap.selector);
         assertEq(hookDelta, 0);
     }
+    function test_exactOutputRejected() public {
+        vm.prank(address(poolManager));
+        vm.expectRevert(TreasuryGuardHook.UnsupportedSwapMode.selector);
+        hook.beforeSwap(swapper, key, SwapParams(true, 1, 0), "");
+    }
+
+    function test_otherInputCurrencyRejected() public {
+        vm.prank(address(poolManager));
+        vm.expectRevert(TreasuryGuardHook.UnsupportedInputCurrency.selector);
+        hook.beforeSwap(swapper, key, SwapParams(false, -1, 0), "");
+    }
+
 }

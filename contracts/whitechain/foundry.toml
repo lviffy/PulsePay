@@ -2,7 +2,8 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-solc = "../../.bin/solc"
+solc_version = "0.8.26"
+evm_version = "cancun"
 optimizer = true
 optimizer_runs = 200
 remappings = [

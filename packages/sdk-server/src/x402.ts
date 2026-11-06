@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { resolve } from "node:path";
 import { HederaMirrorClient, mirrorTransactionId, transferCredit, amountTinybarsSchema } from "@pulsepay/adapter-hedera";
 
 export interface X402PriceSpec {
@@ -17,6 +18,10 @@ export interface X402RouteConfig {
   facilitatorUrl?: string;
   statePath?: string;
   mirror?: HederaMirrorClient;
+  /** Pure response builder; the result is journaled with redemption and reused on retries. */
+  createResponse?: () => unknown;
+  maxPendingChallenges?: number;
+  maxStoredChallenges?: number;
 }
 export interface X402PaymentRequirement {
   version: "1.0";
@@ -29,8 +34,8 @@ export interface X402PaymentRequirement {
   serviceId: string;
   expiresAt: number;
 }
-interface Challenge extends X402PaymentRequirement { issuedAt: number; transactionId?: string; payer?: string; consensusTimestamp?: string; }
-const verifying = new Set<string>();
+interface Challenge extends X402PaymentRequirement { issuedAt: number; transactionId?: string; payer?: string; consensusTimestamp?: string; response?: unknown; }
+const verifying = new Map<string, Promise<void>>();
 function load(path: string): Record<string, Challenge> {
   try { return JSON.parse(readFileSync(path, "utf8")); }
   catch (error: any) { if (error.code === "ENOENT") return {}; throw error; }
@@ -55,7 +60,19 @@ export async function handleX402PaymentCheck(config: X402RouteConfig, paymentSig
     const requirement: Challenge = { version: "1.0", scheme: "hedera-native-receipt", challengeId: randomBytes(16).toString("hex"), network: config.price.network,
       asset: config.price.asset, amount: config.price.amountTinybars, recipient: config.price.payTo, serviceId: config.serviceId,
       issuedAt: Math.floor(Date.now()/1000), expiresAt: Math.floor(Date.now()/1000) + 300 };
-    const state = load(path); state[requirement.challengeId] = requirement; save(path, state);
+    const state = load(path);
+    for (const [id, entry] of Object.entries(state)) {
+      if (!entry.transactionId && entry.expiresAt < Date.now()/1000) delete state[id];
+    }
+    if (Object.keys(state).length >= (config.maxStoredChallenges ?? 10000)) {
+      save(path, state);
+      return reply(503, { error: "Payment storage capacity reached; merchant maintenance required" });
+    }
+    if (Object.values(state).filter(c => !c.transactionId).length >= (config.maxPendingChallenges ?? 1000)) {
+      save(path, state);
+      return reply(429, { error: "Too many pending payment challenges. Retry later." }, { "Retry-After": "60" });
+    }
+    state[requirement.challengeId] = requirement; save(path, state);
     return reply(402, { error: "Payment Required", requirement }, { "PAYMENT-REQUIRED": JSON.stringify(requirement) });
   }
   // The challenge ID is a bearer secret. Only its hash goes into the public transaction memo.
@@ -65,11 +82,24 @@ export async function handleX402PaymentCheck(config: X402RouteConfig, paymentSig
     if (!/^[a-f0-9]{32}$/.test(proof.challengeId)) throw new Error();
     proof.transactionId = mirrorTransactionId(proof.transactionId);
   } catch { return reply(400, { error: "Invalid payment proof" }); }
+  const key = `${resolve(path)}:${proof.challengeId}`;
+  const inFlight = verifying.get(key);
+  if (inFlight) await inFlight;
   const challenge = load(path)[proof.challengeId];
   if (!challenge || challenge.serviceId !== config.serviceId || challenge.network !== config.price.network || challenge.asset !== config.price.asset || challenge.amount !== config.price.amountTinybars || challenge.recipient !== config.price.payTo) return reply(400, { error: "Payment challenge does not match this service" });
-  if (challenge.transactionId || verifying.has(proof.challengeId)) return reply(409, { error: "Payment challenge already used or being verified" });
+  const settledReply = (entry: Challenge) => {
+    const network = entry.network === "hedera:testnet" ? "testnet" : "mainnet";
+    const settlement = { status: "SUCCESS", serviceId: entry.serviceId, transactionId: entry.transactionId, consensusTimestamp: entry.consensusTimestamp, hashScanUrl: `https://hashscan.io/${network}/transaction/${entry.transactionId}` };
+    return reply(200, { ...settlement, ...(entry.response === undefined ? {} : { resourceResponse: entry.response }) }, { "PAYMENT-RESPONSE": JSON.stringify(settlement) });
+  };
+  if (challenge.transactionId) {
+    if (challenge.transactionId !== proof.transactionId) return reply(409, { error: "Payment challenge was redeemed with another transaction" });
+    if (config.createResponse && challenge.response === undefined) return reply(409, { error: "This legacy redemption has no saved response; contact the merchant" });
+    return settledReply(challenge);
+  }
   if (challenge.expiresAt < Date.now()/1000) return reply(402, { error: "Payment challenge expired" });
-  verifying.add(proof.challengeId);
+  let finish!: () => void;
+  verifying.set(key, new Promise<void>(resolve => { finish = resolve; }));
   try {
     const network = config.price.network === "hedera:testnet" ? "testnet" : "mainnet";
     const mirror = config.mirror || new HederaMirrorClient(network);
@@ -81,15 +111,18 @@ export async function handleX402PaymentCheck(config: X402RouteConfig, paymentSig
       || payer === challenge.recipient || transferCredit(tx, payer) >= 0n || Number(tx.consensus_timestamp) < challenge.issuedAt || Number(tx.consensus_timestamp) > challenge.expiresAt) return reply(400, { error: "Payment does not satisfy the challenge" });
     const state = load(path);
     if (Object.values(state).some(c => c.transactionId === proof.transactionId) || state[proof.challengeId]?.transactionId) return reply(409, { error: "Payment already redeemed" });
-    state[proof.challengeId] = { ...challenge, transactionId: proof.transactionId, payer, consensusTimestamp: tx.consensus_timestamp }; save(path, state);
-    const settlement = { status: "SUCCESS", serviceId: config.serviceId, transactionId: proof.transactionId, consensusTimestamp: tx.consensus_timestamp, hashScanUrl: `https://hashscan.io/${network}/transaction/${proof.transactionId}` };
-    return reply(200, settlement, { "PAYMENT-RESPONSE": JSON.stringify(settlement) });
+    const response = config.createResponse?.();
+    if (response !== undefined && Buffer.byteLength(JSON.stringify(response)) > 65536) throw new Error("Purchased response exceeds the 64 KiB storage bound");
+    // JSON serialization precedes redemption: builders must be pure and return JSON data.
+    const entry = JSON.parse(JSON.stringify({ ...challenge, transactionId: proof.transactionId, payer, consensusTimestamp: tx.consensus_timestamp, response })) as Challenge;
+    state[proof.challengeId] = entry; save(path, state);
+    return settledReply(entry);
   } catch { return reply(503, { error: "Payment could not be confirmed. Retry this proof; do not pay again." }); }
-  finally { verifying.delete(proof.challengeId); }
+  finally { verifying.delete(key); finish(); }
 }
 
 export function getVerifiedHederaPayments(statePath = ".pulsepay/challenges.json") {
-  return Object.values(load(statePath)).filter(c => c.transactionId).map(({ challengeId, ...payment }) => payment);
+  return Object.values(load(statePath)).filter(c => c.transactionId).map(({ challengeId: _challengeId, response: _response, ...payment }) => payment);
 }
 export function generateX402Manifest(services: X402RouteConfig[]) {
   for (const service of services) validate(service);

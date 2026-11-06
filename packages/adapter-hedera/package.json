@@ -8,7 +8,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "test": "node test/hedera.test.mjs"
+    "test": "node test/hedera.test.mjs",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@hashgraph/hedera-agent-kit": "^4.2.0",

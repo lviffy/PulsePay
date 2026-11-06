@@ -1,10 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { usePulsePay } from "./context.js";
-import {
-  WHITECHAIN_USDT_ADDRESS,
-  WHITECHAIN_SEPOLIA_EXPLORER,
-  SwapQuote,
-} from "@pulsepay/shared";
+import { WHITECHAIN_SEPOLIA_EXPLORER, type Invoice } from "@pulsepay/shared";
 
 export interface PulsePayCheckoutProps {
   invoiceId: string;
@@ -13,241 +9,58 @@ export interface PulsePayCheckoutProps {
   onError?: (err: Error) => void;
 }
 
-export function PulsePayCheckout({
-  invoiceId,
-  enablePayWithAnyToken = true,
-  onSuccess,
-  onError,
-}: PulsePayCheckoutProps) {
+/** Direct USDT checkout. Success requires a matching onchain PaymentSettled event. */
+export function PulsePayCheckout({ invoiceId, enablePayWithAnyToken = false, onSuccess, onError }: PulsePayCheckoutProps) {
   const { client } = usePulsePay();
-
-  const [paymentMethod, setPaymentMethod] = useState<"USDT" | "SWAP">("USDT");
-  const [selectedToken, setSelectedToken] = useState<"WETH" | "USDC">("WETH");
-  const [quote, setQuote] = useState<SwapQuote | null>(null);
-  const [loadingQuote, setLoadingQuote] = useState(false);
-  const [status, setStatus] = useState<"IDLE" | "PENDING" | "CONFIRMED" | "ERROR">("IDLE");
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [status, setStatus] = useState<"LOADING" | "READY" | "PENDING" | "CONFIRMED" | "ERROR">("LOADING");
+  const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Default invoice values (in production fetched via client.invoices.get)
-  const invoiceAmountUsdt = "20.00";
-  const invoiceAmountUnits = 20_000_000n; // 20 USDT (6 decimals)
+  const paying = useRef(false);
 
   useEffect(() => {
-    if (paymentMethod === "SWAP") {
-      setLoadingQuote(true);
-      client.checkout
-        .quotePayWithToken({
-          tokenInAddress:
-            selectedToken === "WETH"
-              ? "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
-              : "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238",
-          tokenInSymbol: selectedToken,
-          tokenInDecimals: selectedToken === "WETH" ? 18 : 6,
-          tokenOutAddress: WHITECHAIN_USDT_ADDRESS,
-          targetUsdtAmountUnits: invoiceAmountUnits,
-          payerAddress: "0x0000000000000000000000000000000000000000",
-        })
-        .then((q) => {
-          setQuote(q);
-          setLoadingQuote(false);
-        })
-        .catch((err) => {
-          console.error("Quote error:", err);
-          setLoadingQuote(false);
-        });
+    let active = true;
+    setStatus("LOADING"); setInvoice(null); setError(null); setTxHash(null);
+    if (!/^0x[a-fA-F0-9]{64}$/.test(invoiceId)) {
+      setError("Invoice ID must be a bytes32 hex value"); setStatus("ERROR"); return;
     }
-  }, [paymentMethod, selectedToken, client]);
+    client.invoices.get(invoiceId as `0x${string}`).then(value => {
+      if (!active) return;
+      if (!value || value.status !== "OPEN" || value.dueAt < Date.now()/1000) throw new Error("Invoice is missing, expired or already paid");
+      setInvoice(value); setStatus("READY");
+    }).catch((error: unknown) => {
+      if (active) { setError(error instanceof Error ? error.message : "Invoice could not be loaded"); setStatus("ERROR"); }
+    });
+    return () => { active = false; };
+  }, [client, invoiceId]);
 
-  const handlePay = async () => {
+  const pay = async () => {
+    if (paying.current || !invoice || status !== "READY") return;
+    paying.current = true; setStatus("PENDING"); setError(null);
+    let hash: string;
     try {
-      setStatus("PENDING");
-      setErrorMessage(null);
-
-      // Simulation / wallet dispatch
-      // In production connected via wagmi/injected wallet
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const mockTxHash = `0x${Array.from({ length: 64 }, () =>
-        Math.floor(Math.random() * 16).toString(16)
-      ).join("")}`;
-
-      setTxHash(mockTxHash);
-      setStatus("CONFIRMED");
-      onSuccess?.(mockTxHash);
-    } catch (err: any) {
-      setStatus("ERROR");
-      setErrorMessage(err.message || "Payment transaction failed");
-      onError?.(err);
+      hash = await client.whitechain.payInvoice(invoiceId as `0x${string}`);
+    } catch (cause: unknown) {
+      const error = cause instanceof Error ? cause : new Error("Payment failed");
+      setError(error.message); setStatus("ERROR"); paying.current = false; onError?.(error); return;
     }
+    setTxHash(hash); setStatus("CONFIRMED"); paying.current = false;
+    onSuccess?.(hash);
   };
-
+  const amount = invoice ? `${invoice.amountUnits / 1000000n}.${(invoice.amountUnits % 1000000n).toString().padStart(6, "0")}` : "—";
   return (
-    <div
-      style={{
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        border: "1px solid #e2e8f0",
-        borderRadius: "12px",
-        padding: "24px",
-        maxWidth: "460px",
-        backgroundColor: "#ffffff",
-        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <h3 style={{ margin: 0, fontSize: "18px", color: "#0f172a", fontWeight: "600" }}>PulsePay Checkout</h3>
-        <span
-          style={{
-            fontSize: "12px",
-            backgroundColor: "#f1f5f9",
-            color: "#475569",
-            padding: "4px 8px",
-            borderRadius: "6px",
-          }}
-        >
-          Whitechain Sepolia
-        </span>
-      </div>
-
-      <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "8px", marginBottom: "20px" }}>
-        <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "4px" }}>Total Amount Due</div>
-        <div style={{ fontSize: "28px", fontWeight: "700", color: "#0f172a" }}>
-          ${invoiceAmountUsdt} <span style={{ fontSize: "16px", color: "#64748b", fontWeight: "500" }}>USDT</span>
-        </div>
-        <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>
-          Invoice ID: {invoiceId.slice(0, 10)}...{invoiceId.slice(-6)}
-        </div>
-      </div>
-
-      {enablePayWithAnyToken && (
-        <div style={{ marginBottom: "20px" }}>
-          <div style={{ fontSize: "13px", fontWeight: "500", color: "#334155", marginBottom: "8px" }}>
-            Select Payment Asset
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-            <button
-              type="button"
-              onClick={() => setPaymentMethod("USDT")}
-              style={{
-                padding: "10px",
-                borderRadius: "8px",
-                border: paymentMethod === "USDT" ? "2px solid #2563eb" : "1px solid #cbd5e1",
-                backgroundColor: paymentMethod === "USDT" ? "#eff6ff" : "#ffffff",
-                cursor: "pointer",
-                fontWeight: "500",
-                fontSize: "14px",
-                color: paymentMethod === "USDT" ? "#1d4ed8" : "#334155",
-              }}
-            >
-              Direct USDT
-            </button>
-            <button
-              type="button"
-              onClick={() => setPaymentMethod("SWAP")}
-              style={{
-                padding: "10px",
-                borderRadius: "8px",
-                border: paymentMethod === "SWAP" ? "2px solid #2563eb" : "1px solid #cbd5e1",
-                backgroundColor: paymentMethod === "SWAP" ? "#eff6ff" : "#ffffff",
-                cursor: "pointer",
-                fontWeight: "500",
-                fontSize: "14px",
-                color: paymentMethod === "SWAP" ? "#1d4ed8" : "#334155",
-              }}
-            >
-              Pay With Any Token (via Uniswap)
-            </button>
-          </div>
-        </div>
-      )}
-
-      {paymentMethod === "SWAP" && (
-        <div
-          style={{
-            border: "1px solid #e0e7ff",
-            backgroundColor: "#eef2ff",
-            padding: "14px",
-            borderRadius: "8px",
-            marginBottom: "20px",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-            <span style={{ fontSize: "13px", color: "#4338ca", fontWeight: "500" }}>Hold a different token?</span>
-            <select
-              value={selectedToken}
-              onChange={(e) => setSelectedToken(e.target.value as any)}
-              style={{
-                padding: "4px 8px",
-                borderRadius: "6px",
-                border: "1px solid #c7d2fe",
-                fontSize: "13px",
-              }}
-            >
-              <option value="WETH">WETH</option>
-              <option value="USDC">USDC</option>
-            </select>
-          </div>
-
-          {loadingQuote ? (
-            <div style={{ fontSize: "12px", color: "#6366f1" }}>Fetching real-time Uniswap routing quote...</div>
-          ) : quote ? (
-            <div>
-              <div style={{ fontSize: "14px", fontWeight: "600", color: "#312e81" }}>
-                You pay: ~{selectedToken === "WETH" ? (Number(quote.inputAmount) / 1e18).toFixed(4) : (Number(quote.inputAmount) / 1e6).toFixed(2)} {selectedToken}
-              </div>
-              <div style={{ fontSize: "11px", color: "#6366f1", marginTop: "4px" }}>
-                {quote.route} (Slippage: {quote.slippageTolerance}%)
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      {status === "CONFIRMED" ? (
-        <div style={{ padding: "16px", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px" }}>
-          <div style={{ color: "#166534", fontWeight: "600", fontSize: "15px" }}>✓ Payment Settled Successfully</div>
-          {txHash && (
-            <div style={{ marginTop: "6px" }}>
-              <a
-                href={`${WHITECHAIN_SEPOLIA_EXPLORER}/tx/${txHash}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{ fontSize: "12px", color: "#2563eb", textDecoration: "underline" }}
-              >
-                View on Whitechain Explorer →
-              </a>
-            </div>
-          )}
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={handlePay}
-          disabled={status === "PENDING" || (paymentMethod === "SWAP" && loadingQuote)}
-          style={{
-            width: "100%",
-            padding: "12px",
-            borderRadius: "8px",
-            border: "none",
-            backgroundColor: status === "PENDING" ? "#94a3b8" : "#2563eb",
-            color: "#ffffff",
-            fontSize: "15px",
-            fontWeight: "600",
-            cursor: status === "PENDING" ? "not-allowed" : "pointer",
-          }}
-        >
-          {status === "PENDING"
-            ? "Confirming Onchain..."
-            : paymentMethod === "SWAP"
-            ? `Swap & Pay $${invoiceAmountUsdt} USDT`
-            : `Pay $${invoiceAmountUsdt} in Official USDT`}
-        </button>
-      )}
-
-      {errorMessage && (
-        <div style={{ marginTop: "12px", color: "#dc2626", fontSize: "13px" }}>{errorMessage}</div>
-      )}
-    </div>
+    <section aria-label="PulsePay checkout" style={{ fontFamily: "system-ui", border: "1px solid #cbd5e1", borderRadius: 12, padding: 24, maxWidth: 460 }}>
+      <h3>PulsePay Checkout</h3>
+      <p>Whitechain Sepolia · USDT</p>
+      <p>Invoice: <code>{invoiceId}</code></p>
+      <p><strong>{amount} USDT</strong></p>
+      {enablePayWithAnyToken && <p>Token swaps cannot settle a Whitechain invoice through the Unichain router. Pay this invoice directly in USDT.</p>}
+      {status === "CONFIRMED" && txHash ? <p role="status">Payment confirmed. <a href={`${WHITECHAIN_SEPOLIA_EXPLORER}/tx/${txHash}`} target="_blank" rel="noreferrer">View verified transaction</a></p> :
+        <button type="button" onClick={pay} disabled={status !== "READY" || !client.whitechain.walletClient}>
+          {status === "LOADING" ? "Loading invoice…" : status === "PENDING" ? "Waiting for wallet and settlement…" : "Pay invoice in USDT"}
+        </button>}
+      {!client.whitechain.walletClient && <p>Connect a Whitechain wallet through the provider configuration to pay.</p>}
+      {error && <p role="alert">{error}</p>}
+    </section>
   );
 }
-

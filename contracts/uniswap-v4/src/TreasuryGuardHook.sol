@@ -5,6 +5,7 @@ import {BaseHook} from "./base/BaseHook.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {Currency} from "v4-core/src/types/Currency.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/src/types/BeforeSwapDelta.sol";
@@ -24,10 +25,14 @@ contract TreasuryGuardHook is BaseHook, Ownable {
     error TreasurySwapsPaused();
     error SwapAmountExceedsPolicyLimit(uint256 amount, uint256 limit);
     error InvalidLimit();
+    error UnsupportedSwapMode();
+    error UnsupportedInputCurrency();
 
     // --- State Variables ---
     /// @notice Maximum allowed input token amount per swap
     uint256 public maxSwapAmount;
+    /// @notice The sole input currency this deployment guards; limits use its native base units.
+    address public immutable limitCurrency;
 
     /// @notice Emergency circuit-breaker pause switch
     bool public paused;
@@ -47,8 +52,11 @@ contract TreasuryGuardHook is BaseHook, Ownable {
     constructor(
         IPoolManager _poolManager,
         uint256 _initialMaxSwapAmount,
-        address _treasuryOwner
+        address _treasuryOwner,
+        address _limitCurrency
     ) BaseHook(_poolManager) Ownable(_treasuryOwner) {
+        if (_initialMaxSwapAmount == 0 || _limitCurrency == address(0)) revert InvalidLimit();
+        limitCurrency = _limitCurrency;
         maxSwapAmount = _initialMaxSwapAmount;
         paused = false;
     }
@@ -92,15 +100,17 @@ contract TreasuryGuardHook is BaseHook, Ownable {
 
     function beforeSwap(
         address,
-        PoolKey calldata,
+        PoolKey calldata key,
         SwapParams calldata params,
         bytes calldata
-    ) external override onlyPoolManager returns (bytes4, BeforeSwapDelta, uint24) {
+    ) external view override onlyPoolManager returns (bytes4, BeforeSwapDelta, uint24) {
         if (paused) revert TreasurySwapsPaused();
-
-        uint256 swapAmount = params.amountSpecified < 0
-            ? uint256(-params.amountSpecified)
-            : uint256(params.amountSpecified);
+        // Positive amountSpecified is output, so it cannot enforce an input spending cap.
+        if (params.amountSpecified >= 0) revert UnsupportedSwapMode();
+        if (Currency.unwrap(params.zeroForOne ? key.currency0 : key.currency1) != limitCurrency) {
+            revert UnsupportedInputCurrency();
+        }
+        uint256 swapAmount = uint256(-(params.amountSpecified + 1)) + 1;
 
         if (maxSwapAmount > 0 && swapAmount > maxSwapAmount) {
             revert SwapAmountExceedsPolicyLimit(swapAmount, maxSwapAmount);

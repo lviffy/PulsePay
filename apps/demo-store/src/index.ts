@@ -1,20 +1,35 @@
 import http, { IncomingMessage, ServerResponse } from "http";
 import { parse } from "url";
 import crypto from "crypto";
+import { join } from "node:path";
+import { createPulsePay } from "@pulsepay/sdk-core";
+import { config } from "./config.js";
+import { merchantAuth, equalSecret, RequestLimits, usdtUnits, amountNumber, text, escapeHtml } from "./security.js";
+import { acquireStateOwner } from "@pulsepay/adapter-hedera";
+import { UniswapRoutingAdapter } from "@pulsepay/adapter-uniswap";
 import { handleX402PaymentCheck, generateX402Manifest, getVerifiedHederaPayments, formatAccountantCsv } from "@pulsepay/sdk-server";
 import {
-  WHITECHAIN_SEPOLIA_CHAIN_ID,
   WHITECHAIN_USDT_ADDRESS,
   WHITECHAIN_SEPOLIA_EXPLORER,
-  UNICHAIN_SEPOLIA_CHAIN_ID,
   UNICHAIN_SEPOLIA_POOL_MANAGER,
-  HEDERA_TESTNET_CHAIN_ID,
   NormalizedActivity,
 } from "@pulsepay/shared";
 
-const PORT = process.env.PORT || 3000;
-const merchantAccountId = process.env.HEDERA_MERCHANT_ACCOUNT_ID;
-if (!merchantAccountId || !/^\d+\.\d+\.\d+$/.test(merchantAccountId)) throw new Error("Set HEDERA_MERCHANT_ACCOUNT_ID to a testnet account you control");
+const releaseState = acquireStateOwner(config.stateDirectory, "server");
+for (const signal of ["SIGTERM", "SIGINT"] as const) process.once(signal, () => { releaseState(); process.exit(0); });
+const PORT = config.port;
+const merchantAccountId = config.merchantAccountId;
+const auth = merchantAuth(config.secret, config.origin);
+const requestLimits = new RequestLimits();
+const paymentStatePath = join(config.stateDirectory, "challenges.json");
+const verifiedPayments = () => getVerifiedHederaPayments(paymentStatePath);
+const routing = new UniswapRoutingAdapter({ apiKey: process.env.UNISWAP_API_KEY, chainId: Number(process.env.UNISWAP_CHAIN_ID || "1301") });
+const evm = process.env.WHITECHAIN_MERCHANT_HUB_ADDRESS ? createPulsePay({
+  whitechain: { contractAddress: process.env.WHITECHAIN_MERCHANT_HUB_ADDRESS as `0x${string}`, rpcUrl: process.env.WHITECHAIN_RPC_URL, usdtAddress: process.env.WHITECHAIN_USDT_ADDRESS as `0x${string}` | undefined },
+  uniswap: { routing: { apiKey: process.env.UNISWAP_API_KEY, chainId: Number(process.env.UNISWAP_CHAIN_ID || "1301") },
+    ...(process.env.UNISWAP_TREASURY_HOOK_ADDRESS ? { treasury: { hookAddress: process.env.UNISWAP_TREASURY_HOOK_ADDRESS as `0x${string}`, rpcUrl: process.env.UNISWAP_RPC_URL, poolManagerAddress: process.env.UNISWAP_POOL_MANAGER as `0x${string}` | undefined } } : {}) },
+}) : undefined;
+const demoRoutes = new Set(["/api/invoices/create", "/api/invoices/refund", "/api/treasury/hook-config", "/api/treasury/swap", "/api/treasury/claim-fees", "/api/subscriptions/renew", "/api/reserves/withdraw", "/api/webhooks/test"]);
 
 // ============================================================================
 // Data Stores & Live State
@@ -117,7 +132,7 @@ const merchantState = {
   } as AgentCommerceState,
   webhooks: {
     endpoint: "https://api.acmestudio.com/webhooks/pulsepay",
-    secret: "whsec_live_948f2a67e103b4cd81e9f1a2",
+    secret: crypto.randomBytes(32).toString("hex"),
     events: ["invoice.paid", "payment.refunded", "subscription.renewed", "agent.x402_settled"],
   },
 };
@@ -285,22 +300,24 @@ const mockActivities: NormalizedActivity[] = [
 // Acme paid market data service config for Hedera x402
 const acmeServices = [
   {
+    statePath: paymentStatePath,
     serviceId: "market-data-pro",
     serviceName: "Acme Real-Time Orderbook API",
     description: "High-frequency real-time orderbook feeds for autonomous trading agents.",
     price: {
-      network: "hedera:testnet" as const,
+      network: `hedera:${config.network}` as "hedera:testnet" | "hedera:mainnet",
       asset: "0.0.0", // Native HBAR
       amountTinybars: process.env.HEDERA_SERVICE_PRICE_TINYBARS || "1",
       payTo: merchantAccountId,
     },
   },
   {
+    statePath: paymentStatePath,
     serviceId: "ai-sentiment-feed",
     serviceName: "Crypto NLP Sentiment Stream",
     description: "Machine-readable sentiment vectors parsed across major onchain social graphs.",
     price: {
-      network: "hedera:testnet" as const,
+      network: `hedera:${config.network}` as "hedera:testnet" | "hedera:mainnet",
       asset: "0.0.0",
       amountTinybars: "120000000", // 1.20 HBAR
       payTo: merchantAccountId,
@@ -315,7 +332,12 @@ const acmeServices = [
 function parseJsonBody<T>(req: IncomingMessage): Promise<T> {
   return new Promise((resolve, reject) => {
     let body = "";
-    req.on("data", (chunk) => (body += chunk));
+    let bytes = 0;
+    req.on("data", (chunk) => {
+      bytes += chunk.length;
+      if (bytes > 16384) { reject(new Error("Request body exceeds 16 KiB")); req.resume(); return; }
+      body += chunk;
+    });
     req.on("end", () => {
       try {
         resolve(body ? JSON.parse(body) : ({} as T));
@@ -343,37 +365,77 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   const parsed = parse(req.url || "/", true);
   const pathname = parsed.pathname || "/";
 
-  // CORS headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, PAYMENT-SIGNATURE, x-api-key");
-  res.setHeader("Access-Control-Expose-Headers", "PAYMENT-REQUIRED, PAYMENT-RESPONSE");
-
-  if (req.method === "OPTIONS") {
-    res.writeHead(204);
-    res.end();
+  auth.headers(req, res);
+  const respond = (status: number, body: unknown) => { res.writeHead(status, { "Content-Type": "application/json" }); res.end(JSON.stringify(body, (_key, value) => typeof value === "bigint" ? value.toString() : value)); };
+  if (req.headers.origin && req.headers.origin !== config.origin) { respond(403, { error: "Origin is not allowed" }); return; }
+  if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
+  const remote = req.socket.remoteAddress || "unknown";
+  if (!requestLimits.allow(`all:${remote}`, 300)) { res.setHeader("Retry-After", "60"); respond(429, { error: "Too many requests" }); return; }
+  if (pathname === "/merchant/login" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>Merchant sign in</title><h1>Merchant sign in</h1><form method="post" action="/api/auth/login"><label>Merchant access key <input name="secret" type="password" required autocomplete="current-password"></label><button>Sign in</button></form></html>'); return;
+  }
+  if (pathname === "/api/auth/login" && req.method === "POST") {
+    if (!requestLimits.allow(`login:${remote}`, 10)) { respond(429, { error: "Too many sign-in attempts" }); return; }
+    const chunks: Buffer[] = []; let size = 0;
+    for await (const chunk of req) { size += chunk.length; if (size > 4096) { respond(413, { error: "Request too large" }); return; } chunks.push(chunk); }
+    const supplied = new URLSearchParams(Buffer.concat(chunks).toString()).get("secret") || "";
+    if (!equalSecret(supplied, config.secret)) { respond(401, { error: "Invalid merchant access key" }); return; }
+    res.writeHead(303, { "Set-Cookie": auth.cookie(), Location: "/merchant" }); res.end(); return;
+  }
+  if (pathname.startsWith("/api/") || pathname === "/merchant") {
+    if (!auth.authorized(req)) {
+      if (pathname === "/merchant") { res.writeHead(303, { Location: "/merchant/login" }); res.end(); }
+      else respond(401, { error: "Merchant authentication required" });
+      return;
+    }
+  }
+  if (demoRoutes.has(pathname) && !config.demoMode) { respond(501, { error: "This demo action has no live settlement integration. Set PULSEPAY_DEMO_MODE=true only for an explicitly simulated walkthrough." }); return; }
+  if (demoRoutes.has(pathname)) res.setHeader("X-PulsePay-Mode", "simulation");
+  if (pathname.startsWith("/v1/services/") && !req.headers["payment-signature"] && !requestLimits.allow(`challenge:${remote}`, 30)) {
+    res.setHeader("Retry-After", "60"); respond(429, { error: "Too many payment challenges" }); return;
+  }
+  if (pathname.startsWith("/api/whitechain/invoices/") && req.method === "GET") {
+    const id = pathname.slice("/api/whitechain/invoices/".length);
+    if (!evm) { respond(503, { error: "Configure WHITECHAIN_MERCHANT_HUB_ADDRESS" }); return; }
+    if (!/^0x[a-fA-F0-9]{64}$/.test(id)) { respond(400, { error: "Invoice ID must be bytes32" }); return; }
+    const invoice = await evm.invoices.get(id as `0x${string}`);
+    respond(invoice ? 200 : 404, invoice || { error: "Invoice not found" }); return;
+  }
+  if (pathname === "/api/treasury/policy" && req.method === "GET") {
+    if (!evm?.treasury) { respond(503, { error: "Configure a deployed UNISWAP_TREASURY_HOOK_ADDRESS and Whitechain hub" }); return; }
+    respond(200, await evm.treasury.getHookPolicy()); return;
+  }
+  if (pathname === "/api/uniswap/quote" && req.method === "POST") {
+    try {
+      const data = await parseJsonBody<any>(req);
+      if (typeof data.targetUsdtAmountUnits !== "string" || !/^[0-9]{1,78}$/.test(data.targetUsdtAmountUnits)) throw new Error("Use positive integer output token units");
+      const quote = await routing.getExactOutputQuote({ ...data, targetUsdtAmountUnits: BigInt(data.targetUsdtAmountUnits) });
+      respond(200, quote);
+    } catch (error: any) { respond(400, { error: error.message }); }
     return;
   }
 
   // --- API: Get Live Merchant State ---
   if (pathname === "/api/merchant/state" && req.method === "GET") {
-    const verifiedPayments = getVerifiedHederaPayments();
-    const totalHbarTinybars = verifiedPayments.reduce((sum, payment) => sum + BigInt(payment.amount), 0n);
+    const payments = verifiedPayments();
+    const totalHbarTinybars = payments.reduce((sum, payment) => sum + BigInt(payment.amount), 0n);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
-        metrics: { ...merchantState.metrics, agentRevenueHbar: Number(totalHbarTinybars) / 1e8 },
-        invoices: storeInvoices,
-        subscriptions: storeSubscriptions,
+        mode: config.demoMode ? "SIMULATION" : "LIVE_HEDERA",
+        metrics: { ...Object.fromEntries(Object.entries(merchantState.metrics).map(([key, value]) => [key, config.demoMode ? value : 0])), agentRevenueHbar: Number(totalHbarTinybars) / 1e8 },
+        invoices: config.demoMode ? storeInvoices : [],
+        subscriptions: config.demoMode ? storeSubscriptions : [],
         uniswap: merchantState.uniswap,
         agentCommerce: {
           ...merchantState.agentCommerce,
-          totalAgentCalls: verifiedPayments.length,
+          totalAgentCalls: payments.length,
           totalHbarTinybars: totalHbarTinybars.toString(),
         },
         services: acmeServices,
-        activities: [...mockActivities, ...hederaActivities()],
-        webhooks: merchantState.webhooks,
+        activities: [...(config.demoMode ? mockActivities.map(a => ({ ...a, status: "SIMULATED", txId: "", explorerUrl: "" })) : []), ...hederaActivities()],
+        webhooks: { endpoint: merchantState.webhooks.endpoint, events: merchantState.webhooks.events },
       })
     );
     return;
@@ -390,14 +452,16 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       }>(req);
 
       const id = `inv_acme_${Math.random().toString(36).substring(2, 7)}`;
-      const amount = Number(data.amountUsdt) || 20;
-      const dueDays = Number(data.dueDays) || 7;
+      const amount = amountNumber(usdtUnits(data.amountUsdt));
+      const dueDays = data.dueDays ?? 7;
+      if (!Number.isInteger(dueDays) || dueDays < 1 || dueDays > 365) throw new Error("Due days must be an integer from 1 to 365");
+      if (data.customer && !/^0x[a-fA-F0-9]{40}$/.test(data.customer)) throw new Error("Invalid customer address");
       const dueDate = new Date(Date.now() + dueDays * 86400 * 1000).toISOString().split("T")[0];
 
       const newInvoice: StoreInvoice = {
         id,
         customer: data.customer || "0x0000000000000000000000000000000000000000",
-        title: data.title || "Custom Service Invoice",
+        title: text(data.title, "invoice title", 200),
         amountUsdt: amount,
         reserveHeldUsdt: 0,
         rail: "Direct USDT (Whitechain)",
@@ -411,7 +475,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       merchantState.metrics.totalInvoicesCount += 1;
 
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: true, invoice: newInvoice }));
+      res.end(JSON.stringify({ success: true, simulated: true, invoice: newInvoice }));
       return;
     } catch (e: any) {
       res.writeHead(400, { "Content-Type": "application/json" });
@@ -436,7 +500,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         return;
       }
 
-      const refundAmount = Number(data.amountUsdt);
+      const refundUnits = usdtUnits(data.amountUsdt);
+      const refundAmount = amountNumber(refundUnits);
+      if (!["PAID", "PARTIALLY_REFUNDED"].includes(inv.status)) throw new Error("Invoice is not refundable");
+      if (refundUnits > BigInt(Math.round(merchantState.metrics.refundReserveBalanceUsdt * 1e6))) throw new Error("Insufficient refund reserve");
+      if (data.reason !== undefined) text(data.reason, "refund reason", 300);
       if (refundAmount <= 0 || refundAmount > inv.amountUsdt - inv.refundedAmountUsdt) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Invalid refund amount" }));
@@ -444,20 +512,20 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       }
 
       // Update invoice
-      inv.refundedAmountUsdt += refundAmount;
+      inv.refundedAmountUsdt = amountNumber(BigInt(Math.round(inv.refundedAmountUsdt * 1e6)) + refundUnits);
       inv.refundReason = data.reason || "Customer requested refund";
       inv.status = inv.refundedAmountUsdt >= inv.amountUsdt ? "FULLY_REFUNDED" : "PARTIALLY_REFUNDED";
 
       // Deduct from reserve pool
       merchantState.metrics.refundReserveBalanceUsdt = Math.max(
         0,
-        merchantState.metrics.refundReserveBalanceUsdt - refundAmount
+        amountNumber(BigInt(Math.round(merchantState.metrics.refundReserveBalanceUsdt * 1e6)) - refundUnits)
       );
       merchantState.metrics.totalRefundsCount += 1;
       merchantState.metrics.totalRefundedUsdt += refundAmount;
 
       // Add to normalized activity
-      const txId = `0xrefund_${Math.random().toString(36).substring(2, 8)}`;
+      const txId = "";
       mockActivities.unshift({
         id: `act_refund_${Date.now()}`,
         chainKey: "whitechain",
@@ -474,7 +542,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       });
 
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: true, invoice: inv }));
+      res.end(JSON.stringify({ success: true, simulated: true, invoice: inv }));
       return;
     } catch (e: any) {
       res.writeHead(400, { "Content-Type": "application/json" });
@@ -490,12 +558,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       if (typeof data.paused === "boolean") {
         merchantState.uniswap.hookPaused = data.paused;
       }
-      if (typeof data.maxSwapAmountUsdt === "number" && data.maxSwapAmountUsdt > 0) {
-        merchantState.uniswap.maxSwapAmountUsdt = data.maxSwapAmountUsdt;
+      if (data.maxSwapAmountUsdt !== undefined) {
+        merchantState.uniswap.maxSwapAmountUsdt = amountNumber(usdtUnits(data.maxSwapAmountUsdt));
       }
 
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: true, uniswap: merchantState.uniswap }));
+      res.end(JSON.stringify({ success: true, simulated: true, uniswap: merchantState.uniswap }));
       return;
     } catch (e: any) {
       res.writeHead(400, { "Content-Type": "application/json" });
@@ -523,7 +591,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         return;
       }
 
-      const amount = Number(data.amountUsdt);
+      const amountUnits = usdtUnits(data.amountUsdt);
+      const amount = amountNumber(amountUnits);
+      if (data.fromAsset !== "USDT" || !["WETH", "USDC"].includes(data.toAsset)) throw new Error("Unsupported treasury asset");
       if (amount > merchantState.uniswap.maxSwapAmountUsdt) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(
@@ -540,9 +610,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         return;
       }
 
-      merchantState.metrics.availableProceedsUsdt -= amount;
+      merchantState.metrics.availableProceedsUsdt = amountNumber(BigInt(Math.round(merchantState.metrics.availableProceedsUsdt * 1e6)) - amountUnits);
 
-      const txId = `0xswap_${Math.random().toString(36).substring(2, 8)}`;
+      const txId = "";
       mockActivities.unshift({
         id: `act_swap_${Date.now()}`,
         chainKey: "uniswap",
@@ -561,8 +631,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          success: true,
-          txId,
+          success: true, simulated: true,
           availableProceeds: merchantState.metrics.availableProceedsUsdt,
         })
       );
@@ -583,7 +652,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
-        success: true,
+        success: true, simulated: true,
         claimed: fees,
         newAvailableProceeds: merchantState.metrics.availableProceedsUsdt,
       })
@@ -612,7 +681,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       curNext.setDate(curNext.getDate() + 30);
       sub.nextChargeDate = curNext.toISOString().split("T")[0];
 
-      const txId = `0xsub_${Math.random().toString(36).substring(2, 8)}`;
+      const txId = "";
       mockActivities.unshift({
         id: `act_sub_${Date.now()}`,
         chainKey: "whitechain",
@@ -629,7 +698,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       });
 
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: true, subscription: sub }));
+      res.end(JSON.stringify({ success: true, simulated: true, subscription: sub }));
       return;
     } catch (e: any) {
       res.writeHead(400, { "Content-Type": "application/json" });
@@ -657,7 +726,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       timestamp: Math.floor(Date.now() / 1000),
     });
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ success: true, withdrawnAmount: amount }));
+    res.end(JSON.stringify({ success: true, simulated: true, withdrawnAmount: amount }));
     return;
   }
 
@@ -666,6 +735,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     try {
       const data = await parseJsonBody<{ eventType: string }>(req);
       const eventType = data.eventType || "invoice.paid";
+      if (!merchantState.webhooks.events.includes(eventType)) throw new Error("Unsupported webhook event");
       const payload = {
         eventId: `evt_${Math.random().toString(36).substring(2, 10)}`,
         eventType,
@@ -688,7 +758,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          success: true,
+          success: true, simulated: true,
           endpoint: merchantState.webhooks.endpoint,
           signatureHeader: `sha256=${hmac}`,
           payload,
@@ -711,9 +781,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   // Route 2: Hedera x402 Protected Resource Endpoint
-  if (pathname === "/v1/services/market-data-pro/query" && req.method === "POST") {
+  const paidService = acmeServices.find(service => pathname === `/v1/services/${service.serviceId}/query`);
+  if (paidService && req.method === "POST") {
     const paymentSignature = req.headers["payment-signature"] as string | undefined;
-    const check = await handleX402PaymentCheck(acmeServices[0], paymentSignature);
+    const check = await handleX402PaymentCheck({ ...paidService, createResponse: () => ({
+      status: "SUCCESS", service: paidService.serviceName, sampleData: true,
+      data: { pair: "HBAR/USD", bids: [{ price: 0.0825, volume: 154000 }], asks: [{ price: 0.0827, volume: 110000 }], generatedAt: Date.now() },
+    }) }, paymentSignature);
 
     if (!check.authorized) {
       res.writeHead(check.statusCode, check.headers);
@@ -721,45 +795,19 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
 
-    // Settled payload returned only after payment
-
-    res.writeHead(200, {
-      ...check.headers,
-      "Content-Type": "application/json",
-    });
-    res.end(
-      JSON.stringify(
-        {
-          status: "SUCCESS",
-          service: "Acme Real-Time Orderbook API",
-          data: {
-            pair: "HBAR/USD",
-            bids: [
-              { price: 0.0825, volume: 154000 },
-              { price: 0.0824, volume: 320000 },
-            ],
-            asks: [
-              { price: 0.0827, volume: 110000 },
-              { price: 0.0828, volume: 450000 },
-            ],
-            consensusTimestamp: Date.now(),
-          },
-        },
-        null,
-        2
-      )
-    );
+    res.writeHead(200, check.headers);
+    res.end(JSON.stringify(check.body.resourceResponse));
     return;
   }
 
   // Route 3: Accountant CSV Export
   if (pathname === "/api/hedera/payments" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(getVerifiedHederaPayments()));
+    res.end(JSON.stringify(verifiedPayments()));
     return;
   }
   if (pathname === "/api/export.csv" && req.method === "GET") {
-    const csvData = formatAccountantCsv([...mockActivities, ...hederaActivities()]);
+    const csvData = formatAccountantCsv(hederaActivities());
     res.writeHead(200, {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="pulsepay-ledger-${Date.now()}.csv"`,
@@ -789,9 +837,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     const parts = pathname.split("/");
     const requestedId = parts[2] || "inv_acme_pro_001";
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    if (!config.demoMode || !storeInvoices.some(i => i.id === requestedId)) { res.statusCode = 404; res.end("Receipt not found"); return; }
     res.end(renderReceiptHtml(requestedId));
     return;
   }
+
+  if (pathname !== "/" || req.method !== "GET") { respond(404, { error: "Route not found" }); return; }
 
   // Route 6: Acme Studio Storefront with Drop-in PulsePay Checkout
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -800,7 +851,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
 function hederaAmount(amount: bigint): string { return `${amount / 100000000n}.${(amount % 100000000n).toString().padStart(8, "0")}`; }
 function hederaActivities(): NormalizedActivity[] {
-  return getVerifiedHederaPayments().map(p => ({ id: p.transactionId!, chainKey: "hedera", eventType: "AGENT_SPEND_SETTLED",
+  return verifiedPayments().map(p => ({ id: p.transactionId!, chainKey: "hedera", eventType: "AGENT_SPEND_SETTLED",
     from: p.payer!, to: p.recipient, asset: "HBAR", amountRaw: p.amount, amountFormatted: `${hederaAmount(BigInt(p.amount))} HBAR`,
     status: "CONFIRMED", txId: p.transactionId!, explorerUrl: `https://hashscan.io/${p.network === "hedera:mainnet" ? "mainnet" : "testnet"}/transaction/${p.transactionId}`,
     timestamp: Math.floor(Number(p.consensusTimestamp)) }));
@@ -839,6 +890,7 @@ function renderStorefrontHtml() {
   </style>
 </head>
 <body>
+  <div style="position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#713f12;color:white;padding:8px;text-align:center">EVM preview: simulated invoices, balances and actions. No funds are moved. Verified Hedera payments are listed separately.</div>
   <div class="container">
     <div class="header">
       <div class="badge">ETHGlobal Mumbai 2026 Tri-Track Showcase</div>
@@ -893,7 +945,7 @@ function renderStorefrontHtml() {
 
     <div class="nav-links">
       <a href="/merchant" style="color: #60a5fa; font-weight: 600;">⚡ Open Merchant Operations Dashboard →</a>
-      <a href="/receipt/inv_acme_pro_001">Customer Verifiable Receipt →</a>
+      <a href="/receipt/inv_acme_pro_001">Simulation receipt — no onchain settlement →</a>
       <a href="/.well-known/x402.json" target="_blank">x402 Agent Discovery Manifest ↗</a>
     </div>
   </div>
@@ -909,20 +961,9 @@ function renderStorefrontHtml() {
     }
 
     function executePayment() {
-      const btn = document.getElementById('pay-btn');
       const status = document.getElementById('payment-status');
-      btn.disabled = true;
-      btn.innerText = 'Submitting Transaction...';
       status.style.display = 'block';
-      status.style.color = '#60a5fa';
-      status.innerText = 'Confirming payment on Whitechain Sepolia (Chain ID 1874)...';
-
-      setTimeout(() => {
-        btn.innerText = '✓ Payment Settled';
-        btn.style.background = '#10b981';
-        status.style.color = '#34d399';
-        status.innerHTML = 'Payment Confirmed! <a href="/receipt/inv_acme_pro_001" style="color:#60a5fa;text-decoration:underline;">View Verifiable Receipt →</a>';
-      }, 1400);
+      status.textContent = 'Payment is unavailable in this preview. Use PulsePayCheckout with a connected wallet and an onchain invoice.';
     }
   </script>
 </body>
@@ -930,7 +971,8 @@ function renderStorefrontHtml() {
 }
 
 function renderReceiptHtml(invoiceId: string) {
-  const inv = storeInvoices.find((i) => i.id === invoiceId) || storeInvoices[0];
+  const inv = storeInvoices.find((i) => i.id === invoiceId);
+  if (!inv) return "<!doctype html><title>Receipt not found</title><h1>Receipt not found</h1>";
   const isRefunded = inv.status === "PARTIALLY_REFUNDED" || inv.status === "FULLY_REFUNDED";
 
   return `<!DOCTYPE html>
@@ -953,9 +995,10 @@ function renderReceiptHtml(invoiceId: string) {
   </style>
 </head>
 <body>
+  <div style="position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#713f12;color:white;padding:8px;text-align:center">EVM preview: simulated invoices, balances and actions. No funds are moved. Verified Hedera payments are listed separately.</div>
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-      <h2 style="margin: 0; font-size: 18px; color: #ffffff;">Customer Verifiable Receipt</h2>
+      <h2 style="margin: 0; font-size: 18px; color: #ffffff;">Simulation receipt — no onchain settlement</h2>
       <span class="status-badge ${isRefunded ? "refunded" : ""}">
         ${inv.status}
       </span>
@@ -963,7 +1006,7 @@ function renderReceiptHtml(invoiceId: string) {
 
     <div class="row"><span class="label">Invoice ID</span><span class="val" style="font-family: monospace;">${inv.id}</span></div>
     <div class="row"><span class="label">Merchant</span><span class="val">0xf39F...2266 (Acme Studio)</span></div>
-    <div class="row"><span class="label">Customer</span><span class="val" style="font-family: monospace;">${inv.customer.substring(0, 10)}...</span></div>
+    <div class="row"><span class="label">Customer</span><span class="val" style="font-family: monospace;">${escapeHtml(inv.customer.substring(0, 10))}...</span></div>
     <div class="row"><span class="label">Network</span><span class="val">Whitechain Sepolia (1874)</span></div>
     <div class="row"><span class="label">Payment Rail</span><span class="val">${inv.rail}</span></div>
 
@@ -974,13 +1017,13 @@ function renderReceiptHtml(invoiceId: string) {
       inv.refundedAmountUsdt > 0
         ? `<div class="row" style="color:#ef4444;"><span class="label" style="color:#ef4444;">Cumulative Refund</span><span class="val" style="font-size: 16px; font-weight: 600; color:#ef4444;">-$${inv.refundedAmountUsdt.toFixed(2)} USDT</span></div>
            <div class="row"><span class="label">Net Settled</span><span class="val" style="font-size: 16px; font-weight: 600; color:#10b981;">$${(inv.amountUsdt - inv.refundedAmountUsdt).toFixed(2)} USDT</span></div>
-           <div class="row"><span class="label">Refund Reason</span><span class="val" style="color:#fbbf24;">${inv.refundReason || "Merchant initiated"}</span></div>`
+           <div class="row"><span class="label">Refund Reason</span><span class="val" style="color:#fbbf24;">${escapeHtml(inv.refundReason || "Merchant initiated")}</span></div>`
         : ""
     }
 
     <div class="divider"></div>
 
-    <div style="font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 10px;">Onchain Blockscout Verification:</div>
+    <div style="font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 10px;">Simulation only — these fixture records are not transaction proofs:</div>
     <div style="margin-bottom: 8px;">
       <a class="link" href="${WHITECHAIN_SEPOLIA_EXPLORER}/address/${WHITECHAIN_USDT_ADDRESS}" target="_blank">
         Official USDT Contract (${WHITECHAIN_USDT_ADDRESS.substring(0, 10)}...) ↗
@@ -988,14 +1031,14 @@ function renderReceiptHtml(invoiceId: string) {
     </div>
     <div style="margin-bottom: 8px;">
       <a class="link" href="${WHITECHAIN_SEPOLIA_EXPLORER}/tx/0x89274a...312e" target="_blank">
-        Payment Settlement Proof ↗
+        Sample transaction placeholder (not a proof)
       </a>
     </div>
     ${
       inv.refundedAmountUsdt > 0
         ? `<div style="margin-top: 8px;">
              <a class="link" style="color: #fbbf24;" href="${WHITECHAIN_SEPOLIA_EXPLORER}/tx/0xrefund...789" target="_blank">
-               Refund Transaction Proof (-$${inv.refundedAmountUsdt.toFixed(2)} USDT) ↗
+               Sample refund placeholder (-$${inv.refundedAmountUsdt.toFixed(2)} USDT) ↗
              </a>
            </div>`
         : ""
@@ -1120,6 +1163,7 @@ function renderMerchantHtml() {
   </style>
 </head>
 <body>
+  <div style="position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#713f12;color:white;padding:8px;text-align:center">EVM preview: simulated invoices, balances and actions. No funds are moved. Verified Hedera payments are listed separately.</div>
 
   <!-- Left Sidebar -->
   <aside id="sidebar">
@@ -1804,6 +1848,9 @@ function renderMerchantHtml() {
   <!-- ===================================================================== -->
   <script>
     let appState = null;
+    function escapeHtml(value) {
+      return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+    }
 
     // Load initial state from server
     async function loadState() {
@@ -1872,7 +1919,7 @@ function renderMerchantHtml() {
           <tr>
             <td style="font-family: monospace; font-weight: 600;">\${inv.id}</td>
             <div>
-              <div style="font-weight: 600; color: #fff;">\${inv.title}</div>
+              <div style="font-weight: 600; color: #fff;">\${escapeHtml(inv.title)}</div>
               <div style="font-size: 11px; color: var(--text-muted); font-family: monospace;">Customer: \${inv.customer.substring(0, 12)}...</div>
             </div>
             <td>\${inv.rail}</td>
@@ -1958,7 +2005,7 @@ function renderMerchantHtml() {
       const data = await res.json();
       if (data.success) {
         closeModal('modal-invoice');
-        showToast('✓ Invoice ' + data.invoice.id + ' created successfully!', 'success');
+        showToast('Simulation:  Invoice ' + data.invoice.id + ' created successfully!', 'success');
         loadState();
       }
     }
@@ -1976,7 +2023,7 @@ function renderMerchantHtml() {
       const data = await res.json();
       if (data.success) {
         closeModal('modal-refund');
-        showToast('✓ Issued $' + amountUsdt.toFixed(2) + ' refund on Whitechain!', 'success');
+        showToast('Simulation:  Issued $' + amountUsdt.toFixed(2) + ' refund on Whitechain!', 'success');
         loadState();
       } else {
         alert(data.error);
@@ -2010,7 +2057,7 @@ function renderMerchantHtml() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast('✓ Updated TreasuryGuardHook limit to $' + val.toLocaleString(), 'success');
+        showToast('Simulation:  Updated TreasuryGuardHook limit to $' + val.toLocaleString(), 'success');
         loadState();
       }
     }
@@ -2027,7 +2074,7 @@ function renderMerchantHtml() {
       const data = await res.json();
       if (data.success) {
         closeModal('modal-swap');
-        showToast('✓ Treasury Swap confirmed on Unichain Sepolia!', 'success');
+        showToast('Simulation:  Treasury Swap confirmed on Unichain Sepolia!', 'success');
         loadState();
       } else {
         alert(data.error);
@@ -2038,7 +2085,7 @@ function renderMerchantHtml() {
       const res = await fetch('/api/treasury/claim-fees', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        showToast('✓ Claimed $' + data.claimed.toFixed(2) + ' USDT in LP fees!', 'success');
+        showToast('Simulation:  Claimed $' + data.claimed.toFixed(2) + ' USDT in LP fees!', 'success');
         loadState();
       }
     }
@@ -2051,7 +2098,7 @@ function renderMerchantHtml() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast('✓ Subscription renewal cycle charged on Whitechain!', 'success');
+        showToast('Simulation:  Subscription renewal cycle charged on Whitechain!', 'success');
         loadState();
       }
     }
@@ -2060,7 +2107,7 @@ function renderMerchantHtml() {
       const res = await fetch('/api/reserves/withdraw', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        showToast('✓ Withdrawn proceeds to corporate treasury wallet!', 'success');
+        showToast('Simulation:  Withdrawn proceeds to corporate treasury wallet!', 'success');
         loadState();
       }
     }
@@ -2077,7 +2124,7 @@ function renderMerchantHtml() {
         box.innerHTML = '<span style="color:#34d399;">[200 OK] Dispatched ' + eventType + '</span>\\n' +
           'Header: x-pulsepay-signature: ' + data.signatureHeader + '\\n' +
           JSON.stringify(data.payload, null, 2);
-        showToast('✓ Dispatched signed webhook: ' + eventType, 'info');
+        showToast('Simulation:  Dispatched signed webhook: ' + eventType, 'info');
       }
     }
 

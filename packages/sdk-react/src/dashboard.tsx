@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from "react";
-import { usePulsePay } from "./context.js";
 import { formatAccountantCsv, NormalizedActivity } from "@pulsepay/shared";
 
 export type DashboardTab =
@@ -37,7 +36,6 @@ export interface DashboardSubscription {
 }
 
 export function MerchantBillingDashboard() {
-  const { client } = usePulsePay();
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -46,13 +44,13 @@ export function MerchantBillingDashboard() {
   const [grossRevenue, setGrossRevenue] = useState(12480.0);
   const [availableBal, setAvailableBal] = useState(9984.0);
   const [reserveBal, setReserveBal] = useState(2496.0);
-  const [uniswapSales, setUniswapSales] = useState(4250.0);
-  const [agentRevenueHbar, setAgentRevenueHbar] = useState(71.0);
-  const [mrr, setMrr] = useState(4120.0);
+  const [uniswapSales] = useState(4250.0);
+  const [agentRevenueHbar] = useState(71.0);
+  const [mrr] = useState(4120.0);
 
   // Uniswap Hook & Treasury State
   const [hookPaused, setHookPaused] = useState(false);
-  const [maxSwapAmount, setMaxSwapAmount] = useState(10000.0);
+  const [maxSwapAmount] = useState(10000.0);
   const [lpFeesAccrued, setLpFeesAccrued] = useState(184.2);
   const [swapModalOpen, setSwapModalOpen] = useState(false);
   const [swapToAsset, setSwapToAsset] = useState("WETH");
@@ -188,7 +186,7 @@ export function MerchantBillingDashboard() {
   ]);
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
+    setToastMessage("Simulation: " + msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -344,7 +342,7 @@ export function MerchantBillingDashboard() {
   };
 
   const handleDownloadCsv = () => {
-    const csvContent = formatAccountantCsv(activities);
+    const csvContent = formatAccountantCsv([]);
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -389,6 +387,7 @@ export function MerchantBillingDashboard() {
         display: "flex",
       }}
     >
+      <div role="status" style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10000, background: "#713f12", color: "white", padding: 8 }}>Simulation dashboard: all values and actions are sample data. No funds move. CSV exports contain no sample transactions.</div>
       {/* Toast */}
       {toastMessage && (
         <div
@@ -668,7 +667,7 @@ export function MerchantBillingDashboard() {
                       <td style={{ padding: "12px 16px", color: "#34d399" }}>✓ {act.status}</td>
                       <td style={{ padding: "12px 16px" }}>
                         <a
-                          href={act.explorerUrl}
+                          href="#" aria-disabled="true" onClick={(event) => event.preventDefault()}
                           target="_blank"
                           rel="noreferrer"
                           style={{ color: "#60a5fa", textDecoration: "underline" }}
