@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getDoc, catalog } from '$lib/docs';
+import { getDoc, catalog } from '$lib/server/docs';
 import { renderMarkdown } from '$lib/markdown';
 import type { PageServerLoad } from './$types';
 

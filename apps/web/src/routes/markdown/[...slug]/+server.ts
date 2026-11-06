@@ -1,4 +1,4 @@
-import { getDoc } from '$lib/docs';
+import { getDoc } from '$lib/server/docs';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params }) => {

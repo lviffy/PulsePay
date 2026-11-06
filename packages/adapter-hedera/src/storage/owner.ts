@@ -6,16 +6,36 @@ import { hostname } from "node:os";
 export function acquireStateOwner(directory: string, role: "server" | "worker"): () => void {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const path = join(directory, `${role}-owner.lock`);
-  try { mkdirSync(path, { mode: 0o700 }); }
-  catch (error: any) {
+  try {
+    mkdirSync(path, { mode: 0o700 });
+  } catch (error: any) {
     if (error.code !== "EEXIST") throw error;
     let owner = "unknown owner";
-    try { owner = readFileSync(join(path, "owner.json"), "utf8"); } catch { /* An incomplete lock also fails closed. */ }
-    throw new Error(`State is already owned: ${path} (${owner}). After a crash, verify the prior process stopped before removing its lock. Multiple replicas require a transactional store.`);
+    try {
+      owner = readFileSync(join(path, "owner.json"), "utf8");
+      const parsed = JSON.parse(owner);
+      if (typeof parsed.pid === "number") {
+        try {
+          process.kill(parsed.pid, 0);
+        } catch (killErr: any) {
+          if (killErr.code === "ESRCH") {
+            // Process is dead: remove stale lock and re-acquire
+            rmSync(path, { recursive: true, force: true });
+            mkdirSync(path, { mode: 0o700 });
+            owner = "";
+          }
+        }
+      }
+    } catch {
+      /* Incomplete or unparseable lock */
+    }
+    if (owner !== "") {
+      throw new Error(`State is already owned: ${path} (${owner}). After a crash, verify the prior process stopped before removing its lock. Multiple replicas require a transactional store.`);
+    }
   }
   writeFileSync(join(path, "owner.json"), JSON.stringify({ pid: process.pid, hostname: hostname() }), { mode: 0o600 });
   let released = false;
-  const release = () => { if (!released) { released = true; rmSync(path, { recursive: true }); } };
+  const release = () => { if (!released) { released = true; rmSync(path, { recursive: true, force: true }); } };
   process.once("exit", release);
   return () => { release(); process.removeListener("exit", release); };
 }

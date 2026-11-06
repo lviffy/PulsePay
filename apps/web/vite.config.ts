@@ -47,10 +47,7 @@ export default defineConfig({
 		sveltekit({
 			adapter: adapter(),
 			alias: {
-				$lib: 'src/lib',
-				'$lib/*': 'src/lib/*',
-				$shaders: 'src/shaders',
-				'$shaders/*': 'src/shaders/*'
+				$lib: 'src/lib'
 			}
 		})
 	],
