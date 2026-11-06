@@ -1,0 +1,85 @@
+{
+  "started": "2026-11-06T10:47:48.590Z",
+  "hub": "0xC81399e6344f9264830ecB6DF46a5e9458f4f2C3",
+  "signer": "0x6105F7D9807998014ca12bF1D67849de7B1094Ac",
+  "steps": [
+    {
+      "name": "Selected and connected configured merchant",
+      "at": "2026-11-06T10:47:50.812Z"
+    },
+    {
+      "name": "Negative invoice amount rejected without a transaction",
+      "at": "2026-11-06T10:47:51.610Z"
+    },
+    {
+      "name": "Console action confirmed",
+      "at": "2026-11-06T10:47:57.957Z",
+      "label": "Create invoice"
+    },
+    {
+      "name": "Invoice lookup/filter matched the created invoice",
+      "at": "2026-11-06T10:47:59.522Z",
+      "id": "0x00ca64338aec24bf0ee4944c195ae64c1e17a05431f8b9c292bcda413451cc00"
+    },
+    {
+      "name": "Checkout settled 0.01 USDT",
+      "at": "2026-11-06T10:48:10.813Z",
+      "id": "0x00ca64338aec24bf0ee4944c195ae64c1e17a05431f8b9c292bcda413451cc00"
+    }
+  ],
+  "transactions": [
+    {
+      "hash": "0x7109c98fee799dae9688293bbb07d9b12f10b5bb17609a4c01d7b5a1d612905a",
+      "function": "createInvoice",
+      "args": [
+        "0x00ca64338aec24bf0ee4944c195ae64c1e17a05431f8b9c292bcda413451cc00",
+        "0x0000000000000000000000000000000000000000",
+        "10000",
+        "1794048472",
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "origin": "browser",
+      "status": "success",
+      "block": "12365708",
+      "gasUsed": "119368",
+      "effectiveGasPrice": "5001000000"
+    },
+    {
+      "hash": "0x4e51ceb7e322ed5aebed45b9dcdf548a9aec0c243e529709c4e75ff5c3a47c2c",
+      "function": "approve",
+      "args": [
+        "0xC81399e6344f9264830ecB6DF46a5e9458f4f2C3",
+        "10000"
+      ],
+      "origin": "browser",
+      "status": "success",
+      "block": "12365717",
+      "gasUsed": "53364",
+      "effectiveGasPrice": "5001000000"
+    },
+    {
+      "hash": "0x3628afe653ef3bda982ac54fad64547eeeea2463c12b03c5a97f30958554c5df",
+      "function": "payInvoice",
+      "args": [
+        "0x00ca64338aec24bf0ee4944c195ae64c1e17a05431f8b9c292bcda413451cc00"
+      ],
+      "origin": "browser",
+      "status": "success",
+      "block": "12365721",
+      "gasUsed": "268980",
+      "effectiveGasPrice": "5001000000"
+    }
+  ],
+  "errors": [],
+  "ids": {
+    "invoice": "0x00ca64338aec24bf0ee4944c195ae64c1e17a05431f8b9c292bcda413451cc00"
+  },
+  "initial": {
+    "balances": {
+      "reserve": "0",
+      "available": "0"
+    },
+    "gas": "986191152033225595",
+    "usdt": "146792375"
+  }
+}

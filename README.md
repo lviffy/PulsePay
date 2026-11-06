@@ -8,7 +8,7 @@ PulsePay combines a Whitechain USDT merchant contract and TypeScript SDK, a Unis
 - **Uniswap:** server-side exact-output Trading API quotes with validated addresses, amounts and responses. No simulated fallback is returned. The treasury hook permits exact-input trades in one configured ERC-20 input currency and checks its raw-unit limit. Exact-output trades and other input currencies are rejected.
 - **Hedera:** native HBAR transfers, Agent Kit spending policies, receipt verification, resumable purchases and persistent HCS audit retries. This is PulsePay's `hedera-native-receipt` HTTP-402 extension, not standardized facilitator interoperability.
 
-The demo storefront and merchant console include an explicitly labeled EVM preview. Its mutations are disabled by default; setting `PULSEPAY_DEMO_MODE=true` enables simulated actions only. They never move funds or create payment proofs. CSV exports include only verified Hedera receipts. The paid sample API returns sample orderbook data, not a live market feed. A cross-chain swap cannot currently settle a Whitechain invoice.
+The SvelteKit merchant console uses deployed contracts and browser-wallet signing. Simulation dashboards, fixture invoice pages and preview mutation endpoints have been removed. The separate payment API serves sample content behind real Hedera receipt verification; it is not a live market feed. A cross-chain swap cannot currently settle a Whitechain invoice. See [the testing guide](docs/TESTING.md) for observed results and the complete manual test flow.
 
 ## Setup
 
@@ -26,13 +26,13 @@ pnpm build
 pnpm --filter pulsepay-demo-store start
 ```
 
-Application scripts load the root `.env` automatically and use the repository root as their working directory. Open `http://localhost:3000/merchant`; sign in with the merchant access secret from `.env`. API clients can instead send `x-api-key: <PULSEPAY_API_SECRET>`. Session cookies are HTTP-only, expire after one hour, and use SameSite=Strict. Production requires an HTTPS `PULSEPAY_APP_URL`.
+Application scripts load the root `.env` automatically and use the repository root as their working directory. The API listens on port 3000; its `/merchant` path redirects to the real frontend console on port 3100. For API session authentication, use `http://localhost:3000/merchant/login` with the merchant access secret from `.env`. API clients can instead send `x-api-key: <PULSEPAY_API_SECRET>`. Session cookies are HTTP-only, expire after one hour, and use SameSite=Strict. Production requires an HTTPS `PULSEPAY_APP_URL`.
 
-`npm run dev` (or `pnpm dev`) compiles the SDK packages with at most two builds at once, watches those packages, and runs the Next.js frontend at `http://localhost:3100`. If the root `.env` contains a valid merchant API secret and Hedera merchant account, it also starts the paid demo API on port 3000. `npm run dev:web` starts just the web development flow; `npm run dev:api` starts the configured API separately. The buyer agent is never launched automatically.
+`npm run dev` (or `pnpm dev`) compiles the SDK packages with at most two builds at once, watches those packages, and runs the SvelteKit frontend at `http://localhost:3100`. If the root `.env` contains a valid merchant API secret and Hedera merchant account, it also starts the paid demo API on port 3000. `npm run dev:web` starts just the web development flow; `npm run dev:api` starts the configured API separately. The buyer agent is never launched automatically.
 
 The supervisor runs the installed Node CLIs directly and excludes production web builds from its watcher. An `npx`-backed `pnpm` wrapper is rejected before any build starts, preventing recursive launcher processes. `pnpm test:dev` checks both normal startup validation and rejection of that wrapper.
 
-The new UI lives in [apps/web](apps/web/README.md). Configure `WHITECHAIN_MERCHANT_HUB_ADDRESS`, `PULSEPAY_MERCHANT_ADDRESS`, `UNISWAP_TREASURY_HOOK_ADDRESS`, `HEDERA_AUDIT_TOPIC_ID`, and `PULSEPAY_SERVICE_URL` for the real integrations you use. Unconfigured reads show a retryable error; this frontend does not consume the demo server's EVM preview state.
+The new UI lives in [apps/web](apps/web/README.md). Configure `WHITECHAIN_MERCHANT_HUB_ADDRESS`, `PULSEPAY_MERCHANT_ADDRESS`, `UNISWAP_TREASURY_HOOK_ADDRESS`, `HEDERA_AUDIT_TOPIC_ID`, and `PULSEPAY_SERVICE_URL` for the real integrations you use. Unconfigured reads show a retryable error; the frontend has no simulated settlement fallback.
 
 ## Verification
 
@@ -60,7 +60,7 @@ Tests use temporary files, mock payment submitters and local EVM execution. They
 | `GET /.well-known/x402.json` | Public | Native Hedera service discovery |
 | `POST /v1/services/:serviceId/query` | Payment proof | 402 challenge; a verified receipt unlocks one saved response |
 | `GET /receipt/hedera/:transactionId` | Public | Verified Hedera receipt |
-| `GET /api/merchant/state` | Merchant | Verified Hedera totals and explicitly marked preview state |
+| `GET /api/merchant/state` | Merchant | Verified Hedera totals and activities only |
 | `GET /api/export.csv` | Merchant | Verified payments only |
 | `GET /api/hedera/payments` | Merchant | Verified payment records, without challenge secrets or saved response data |
 | `GET /api/whitechain/invoices/:bytes32` | Merchant | Real contract invoice read using configured hub/RPC |
@@ -79,7 +79,7 @@ Create a connected viem wallet client on Whitechain Sepolia and pass it into the
 </PulsePayProvider>
 ```
 
-`onSuccess` receives a verified transaction hash. No hardcoded invoice amount or random success hash is used. The supplied wallet must expose an authorized account on chain 1874. The separate `MerchantBillingDashboard` component is a labeled simulation, not a source of accounting evidence.
+`onSuccess` receives a verified transaction hash. No hardcoded invoice amount or random success hash is used. The supplied wallet must expose an authorized account on chain 1874. The simulation-only `MerchantBillingDashboard` component and export have been removed; use the SvelteKit merchant console for real billing operations.
 
 ## Hedera buyer
 

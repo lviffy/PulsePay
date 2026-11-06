@@ -215,7 +215,7 @@ async function main() {
   // Step 4: Track 3 - Hedera x402 Micropayment Negotiation
   // ==========================================================================
   header("STEP 4: Hedera Track — x402 Paywall & AI Agent Challenge");
-  console.log("Simulating server-side protection on an AI agent API endpoint:");
+  console.log("Requesting server-side protection on an AI agent API endpoint:");
   console.log("- Resource: GET /v1/ai/market-intelligence");
   console.log("- Price:    0.5 HBAR (50,000,000 tinybars) per query");
   console.log("- Protocol: x402 'hedera-native-receipt' verified via Hedera Mirror Node");
@@ -231,7 +231,7 @@ async function main() {
     },
   };
 
-  // Simulate incoming unauthenticated request from an AI agent
+  // Check an unauthenticated request without submitting a payment
   const authCheck = await handleX402PaymentCheck(routeConfig, null);
 
   console.log(`\nServer Evaluation Result:`);

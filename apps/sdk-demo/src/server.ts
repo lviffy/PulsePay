@@ -353,7 +353,7 @@ const server = http.createServer(async (req, res) => {
         <button class="btn" onclick="getChallenge()">Generate x402 Challenge</button>
       </div>
       <a class="link" href="https://hashscan.io/testnet/topic/0.0.11330043" target="_blank">↗ View HCS Audit Topic on HashScan</a>
-      <div id="hedera-out" class="output">// Click to simulate an AI agent receiving an x402 paywall challenge...</div>
+      <div id="hedera-out" class="output">// Request an actual HTTP 402 challenge (no payment is submitted)...</div>
     </div>
   </div>
 

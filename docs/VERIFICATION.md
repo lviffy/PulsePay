@@ -1,5 +1,7 @@
 # PulsePay verification — 2026-11-06
 
+> Historical verification log. For current configuration, simulation removals, read-only test results, and manual transaction steps, use [the current testing guide](TESTING.md). Earlier transaction claims below were not re-executed during this check.
+
 ## Final single-account HCS result
 
 The user explicitly authorized one further audit message with a maximum fee of 0.02 HBAR. Transaction `0.0.11327364-1793913820-064120602` settled successfully on topic `0.0.11330043`, charging **393,132 tinybars (0.00393132 HBAR)**. The ledger independently confirmed `CONSENSUSSUBMITMESSAGE`, and the topic query returned sequence **1**, consensus timestamp `1793913869.646957104`. Its payload is `AGENT_PAYMENT_SETTLED`, references payment `0.0.11327364@1793912134.008842902`, and records the correct merchant and 1-tinybar amount.

@@ -15,12 +15,12 @@ async function start(t,demo=false){
  for(let i=0;i<100;i++){if(child.exitCode!==null)throw Error(output);try{await fetch(base);return {base,call:async(path,body,auth=true)=>fetch(base+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(auth?{'x-api-key':secret}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})})};}catch{await new Promise(r=>setTimeout(r,25));}}
  throw Error('Server did not start: '+output);
 }
-test('merchant authentication, secret redaction, demo gate and unpaid proof handling',async(t)=>{
+test('merchant authentication, removed routes and unpaid proof handling',async(t)=>{
  const {base,call}=await start(t);
  assert.equal((await call('/api/merchant/state',undefined,false)).status,401);
  assert.equal((await call('/api/treasury/hook-config',{paused:true},false)).status,401);
- const state=await (await call('/api/merchant/state')).json();assert.equal('secret' in state.webhooks,false);
- assert.equal((await call('/api/treasury/hook-config',{paused:true})).status,501);
+ const state=await (await call('/api/merchant/state')).json();assert.equal('webhooks' in state,false);assert.equal(state.mode,'LIVE_HEDERA');assert.deepEqual(state.activities,[]);
+ assert.equal((await call('/api/treasury/hook-config',{paused:true})).status,410);
  const response=await fetch(base+'/api/merchant/state',{headers:{origin:'https://attacker.example'}});assert.equal(response.headers.get('access-control-allow-origin'),null);
  const csv=await (await call('/api/export.csv')).text();assert.equal(csv.trim().split('\n').length,1);
  assert.equal((await call('/v1/services/market-data-pro/query',{},false)).status,402);
@@ -29,13 +29,27 @@ test('merchant authentication, secret redaction, demo gate and unpaid proof hand
  assert.equal(login.status,303);const cookie=login.headers.get('set-cookie');assert.match(cookie,/HttpOnly/);
  assert.equal((await fetch(base+'/api/merchant/state',{headers:{cookie:cookie.split(';')[0]}})).status,200);
 });
-test('simulation validates amounts and never exports fabricated settlement',async(t)=>{
- const {call}=await start(t,true);
- for(const amount of [-100,'invalid',null,0,0.0000001])assert.equal((await call('/api/treasury/swap',{fromAsset:'USDT',toAsset:'WETH',amountUsdt:amount})).status,400);
- assert.equal((await call('/api/invoices/create',{title:'bad',amountUsdt:-20})).status,400);
- assert.equal((await call('/api/invoices/refund',{invoiceId:'inv_acme_pro_001',amountUsdt:'invalid'})).status,400);
- const swap=await (await call('/api/treasury/swap',{fromAsset:'USDT',toAsset:'WETH',amountUsdt:'100.01'})).json();assert.equal(swap.simulated,true);assert.equal(swap.txId,undefined);
- const invoice=await (await call('/api/invoices/create',{title:'<img src=x onerror=alert(1)>',amountUsdt:'20.000001'})).json();
- assert.equal(invoice.simulated,true);const html=await (await call(invoice.invoice.receiptUrl)).text();assert.ok(!html.includes('<img src=x'));assert.ok(html.includes('Simulation'));
+test('removed previews cannot be re-enabled and never return fabricated settlement',async(t)=>{
+ const {base,call}=await start(t,true);
+ const routes=['/api/invoices/create','/api/invoices/refund','/api/treasury/hook-config','/api/treasury/swap','/api/treasury/claim-fees','/api/subscriptions/renew','/api/reserves/withdraw','/api/webhooks/test'];
+ for(const route of routes){
+  const response=await call(route,{});
+  assert.equal(response.status,410,route);
+  assert.match((await response.json()).error,/removed/);
+ }
+ const state=await (await call('/api/merchant/state')).json();
+ assert.equal(state.mode,'LIVE_HEDERA');
+ assert.equal(state.totalHbarTinybars,'0');
+ for(const field of ['invoices','subscriptions','uniswap','metrics','webhooks'])assert.equal(field in state,false,field);
+ const home=await (await fetch(base)).text();
+ assert.match(home,/PulsePay payment API/);
+ assert.ok(!home.includes('inv_acme_pro_001'));
+ assert.equal((await fetch(base+'/receipt/inv_acme_pro_001')).status,404);
+ assert.equal((await fetch(base+'/receipt/hedera/missing')).status,404);
+ const merchant=await fetch(base+'/merchant',{redirect:'manual'});
+ assert.equal(merchant.status,303);
+ assert.equal(merchant.headers.get('location'),'http://localhost:3100/merchant');
  const csv=await (await call('/api/export.csv')).text();assert.equal(csv.trim().split('\n').length,1);
+ const manifest=await (await fetch(base+'/.well-known/x402.json')).json();
+ assert.ok(manifest.services.every(service=>service.description.includes('sample')));
 });

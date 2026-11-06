@@ -14,5 +14,4 @@ const network = process.env.HEDERA_NETWORK || "testnet";
 if (network !== "testnet" && network !== "mainnet") throw new Error("Unsupported HEDERA_NETWORK");
 const stateDirectory = process.env.PULSEPAY_STATE_DIRECTORY;
 if (process.env.NODE_ENV === "production" && (!stateDirectory || !isAbsolute(stateDirectory))) throw new Error("Production requires an absolute PULSEPAY_STATE_DIRECTORY on persistent storage");
-if (process.env.PULSEPAY_DEMO_MODE && !["true", "false"].includes(process.env.PULSEPAY_DEMO_MODE)) throw new Error("PULSEPAY_DEMO_MODE must be true or false");
-export const config = { port, origin, secret, merchantAccountId, network, demoMode: process.env.PULSEPAY_DEMO_MODE === "true", stateDirectory: resolve(stateDirectory || ".pulsepay") };
+export const config = { port, origin, secret, merchantAccountId, network, stateDirectory: resolve(stateDirectory || ".pulsepay") };

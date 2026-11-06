@@ -8,6 +8,19 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
+test('missing pnpm fails before Turbo starts with installation guidance', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'pulsepay-dev-'));
+  try {
+    const check = spawnSync(process.execPath, ['scripts/dev.mjs', '--check'], {
+      cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 64 * 1024,
+      env: { ...process.env, PATH: directory },
+    });
+    assert.equal(check.status, 1);
+    assert.match(check.stderr, /Install pnpm@12\.14\.0/);
+    assert.equal(check.stdout, '');
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('npm dev enters the Node supervisor without recursively resolving pnpm', () => {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(manifest.scripts.dev, 'node scripts/dev.mjs');

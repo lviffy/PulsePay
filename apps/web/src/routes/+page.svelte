@@ -3,7 +3,7 @@
 	import type { PageData } from './$types';
 	import RepoExplorer from '$lib/components/RepoExplorer.svelte';
 	import TokenFlow from '$lib/components/TokenFlow.svelte';
-	import ProtocolBench from '$lib/components/ProtocolBench.svelte';
+	import SkillInstallWidget from '$lib/components/SkillInstallWidget.svelte';
 	import ProceduralScenes from '$lib/components/ProceduralScenes.svelte';
 	import { gsap, ScrollTrigger } from '$lib/motion';
 
@@ -85,17 +85,30 @@
 		let mm: gsap.MatchMedia | undefined;
 		if (scope) {
 			mm = gsap.matchMedia();
+			mm.add('(min-width: 900px) and (prefers-reduced-motion: no-preference)', () => {
+				const hero = scope!.querySelector<HTMLElement>('.hero')!;
+				gsap.timeline({
+					scrollTrigger: {
+						trigger: hero, start: 'top top', end: () => `+=${window.innerHeight * 1.35}`,
+						pin: true, scrub: 0.6, anticipatePin: 1, invalidateOnRefresh: true,
+						refreshPriority: 1
+					}
+				})
+					.to('.hero-copy, .landing-minimap', { autoAlpha: 0, duration: 0.3 }, 0)
+					.to('.hero-art', {
+						width: () => hero.clientWidth,
+						x: () => -hero.clientWidth / 2,
+						duration: 0.75, ease: 'power2.inOut'
+					}, 0)
+					.to('.dither-rise', { autoAlpha: 0, duration: 0.3 }, 0)
+					.to({}, { duration: 0.25 });
+			});
 			mm.add('(min-width: 1000px) and (prefers-reduced-motion: no-preference)', () => {
 				gsap
 					.timeline({
 						scrollTrigger: { trigger: '.cost-section', start: 'top 70%', end: 'bottom 65%', scrub: true }
 					})
 					.from('.cost-table tbody tr', { opacity: 0.15, stagger: 0.25, ease: 'none' });
-				gsap.to('.dither-rise', {
-					yPercent: -35,
-					ease: 'none',
-					scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true }
-				});
 				gsap.to('.minimap-progress', {
 					scaleY: 1,
 					transformOrigin: 'top',
@@ -141,7 +154,7 @@
 			<div class="hero-disc mono" aria-hidden="true">402</div>
 			<div class="dither-rise" aria-hidden="true"></div>
 		</div>
-		<a href="#protocol" class="landing-minimap" aria-label="Jump to protocol verification">
+		<a href="#protocol" class="landing-minimap" aria-label="Jump to integration tools">
 			<div class="minimap-top mono">
 				<span>PulsePay / rails</span>
 				<span>↘</span>
@@ -224,9 +237,14 @@
 
 	<section id="protocol" class="repo-section section-pad">
 		<div id="repo" aria-hidden="true"></div>
-		<p class="eyebrow" data-decode>005 / THREE RAILS. LIVE VERIFICATION.</p>
-		<h2>Inspect the rails. <br />Run the machine proof.</h2>
-		<ProtocolBench />
+		<p class="eyebrow" data-decode>005 / INTEGRATION TOOLS</p>
+		<h2>Inspect the rails. <br />Use the real integrations.</h2>
+		<div class="actions integration-links">
+			<a href="/merchant/invoices" class="button">Whitechain invoices ↗</a>
+			<a href="/merchant/treasury" class="button">Treasury policy ↗</a>
+			<a href="/merchant/agents" class="button">Hedera audit trail ↗</a>
+		</div>
+		<SkillInstallWidget />
 	</section>
 
 	<section class="final-cta section-pad">

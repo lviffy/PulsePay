@@ -3,7 +3,7 @@
 	import type { SourceFile } from '$lib/source';
 	import CopyButton from './CopyButton.svelte';
 	import Palette from './Palette.svelte';
-	import { gsap, ScrollTrigger } from '$lib/motion';
+	import { gsap } from '$lib/motion';
 
 	interface Props {
 		files: Pick<SourceFile, 'path'>[];
@@ -58,6 +58,7 @@
 	const nodes = $derived(buildTree(files));
 
 	let scope = $state<HTMLDivElement | null>(null);
+	let stage = $state<HTMLDivElement | null>(null);
 	let content = $state<HTMLDivElement | null>(null);
 	const fileCache = new Map<string, SourceFile>();
 
@@ -116,22 +117,27 @@
 		window.addEventListener('keydown', handleKey);
 
 		let mm: gsap.MatchMedia | undefined;
-		if (pinned && scope) {
+		if (pinned && scope && stage) {
 			mm = gsap.matchMedia();
-			mm.add('(min-width: 1000px) and (prefers-reduced-motion: no-preference)', () => {
-				ScrollTrigger.create({
-					trigger: scope,
-					start: 'top 12%',
-					end: '+=850',
-					pin: true,
-					anticipatePin: 1,
-					onUpdate: (self) => {
-						const idx = Math.min(4, Math.floor(self.progress * 5));
-						if (defaults[idx] && selected !== defaults[idx]) {
-							selectFile(defaults[idx]);
-						}
+			mm.add('(min-width: 900px) and (prefers-reduced-motion: no-preference)', () => {
+				gsap.timeline({
+					scrollTrigger: {
+						trigger: stage, start: 'top 24px', end: () => `+=${window.innerHeight * 2}`,
+						pin: true, scrub: 0.6, anticipatePin: 1, invalidateOnRefresh: true
 					}
-				});
+				})
+					.to(scope, {
+						width: () => document.documentElement.clientWidth,
+						height: () => window.innerHeight,
+						x: () => -stage!.getBoundingClientRect().left,
+						y: -24, borderRadius: 0, duration: 0.3, ease: 'power2.inOut'
+					})
+					.to({}, { duration: 0.4 })
+					.to(scope, {
+						width: () => stage!.clientWidth,
+						height: () => stage!.clientHeight,
+						x: 0, y: 0, borderRadius: 14, duration: 0.3, ease: 'power2.inOut'
+					});
 			});
 		}
 
@@ -149,7 +155,8 @@
 	});
 </script>
 
-<div class="ide" bind:this={scope}>
+<div class:ide-stage={pinned} bind:this={stage}>
+<div class="ide" class:ide-scroll={pinned} bind:this={scope}>
 	<div class="ide-toolbar">
 		<div class="ide-tabs" role="tablist" aria-label="SDK source track">
 			{#each tabs as tab, i (tab)}
@@ -284,5 +291,6 @@
 		items={files.map((file) => ({ label: file.path, value: file.path }))}
 		onselect={selectFile}
 	/>
+</div>
 </div>
 

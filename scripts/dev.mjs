@@ -62,6 +62,9 @@ function supervise(child) {
 try {
   // Fail before Turbo can resolve an npx-backed pnpm shim into itself.
   const pnpmPath = process.env.PATH?.split(delimiter).map(directory => resolve(directory, 'pnpm')).find(existsSync);
+  if (!pnpmPath) {
+    throw new Error('pnpm is required by Turbo even when starting with Bun or npm. Install pnpm@12.14.0 and ensure pnpm is on PATH, then retry.');
+  }
   if (pnpmPath) {
     const fd = openSync(pnpmPath, 'r');
     const header = Buffer.alloc(2048);

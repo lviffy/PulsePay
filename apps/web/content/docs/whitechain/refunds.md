@@ -17,7 +17,7 @@ Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use. F
 
 Open /merchant/refunds, choose a paid invoice and enter an amount up to the remaining refundable balance. Review the invoice, original payer and amount in the confirmation modal. Confirm your wallet transaction. The frontend checks receipt.status before reporting success and then reloads contract state.
 
-The reserve belongs to the merchant. A reason string is hashed with keccak256 by issueRefund. A refund sends settlement USDT to the original customer, not to an arbitrary recipient. Insufficient reserve and excess refunds revert.
+The reserve belongs to the merchant. A reason string is hashed with keccak256 by issueRefund. A refund sends settlement USDT to the original customer, not to an arbitrary recipient. The contract consumes refundReserve first, then merchantAvailable. Insufficient combined liquidity and excess refunds revert.
 
 ## 04 / Anatomy
 

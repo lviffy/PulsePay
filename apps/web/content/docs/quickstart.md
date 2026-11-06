@@ -1,6 +1,6 @@
 ## 01 / Overview
 
-Build the workspace, configure the merchant hub, then open a real invoice in the React checkout. The amount comes from the contract.
+Build the workspace, configure the merchant hub, then open a real invoice in the web checkout. The amount comes from the contract.
 
 This page follows the implementation in `README.md`. The source explorer on the landing page exposes the workspace files used by the site.
 
@@ -18,7 +18,7 @@ Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use.
 
 Set WHITECHAIN_MERCHANT_HUB_ADDRESS to your deployed contract and PULSEPAY_MERCHANT_ADDRESS to its merchant wallet. Open /merchant/settings and connect a browser wallet on chain 1874. Create an invoice in /merchant/invoices, then paste its bytes32 ID into /pricing-free. Confirm the exact allowance and payment in your wallet.
 
-The web app listens on port 3100. The separate demo API uses port 3000. For Hedera service discovery, set PULSEPAY_SERVICE_URL to the running API origin. Never put private keys or PULSEPAY_API_SECRET in a NEXT_PUBLIC variable.
+The web app listens on port 3100. The separate demo API uses port 3000. For Hedera service discovery, set PULSEPAY_SERVICE_URL to the running API origin. The frontend is SvelteKit. Keep private keys and PULSEPAY_API_SECRET server-side; never expose them through public client variables.
 
 ## 04 / Anatomy
 

@@ -14,9 +14,9 @@ Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use.
 
 ## 03 / Walkthrough
 
-Pass invoiceId as bytes32. The web app’s /pricing-free page uses the existing component and disables unsupported cross-chain settlement. The widget reads client.invoices.get, validates open status and due time, then calls WhitechainAdapter.payInvoice with a connected wallet. onSuccess receives the verified payment transaction hash.
+Pass invoiceId as bytes32. The SvelteKit /pricing-free page calls the SDK directly and offers direct USDT settlement. React applications can use PulsePayCheckout. The widget reads client.invoices.get, validates open status and due time, then calls WhitechainAdapter.payInvoice with a connected wallet. onSuccess receives the verified payment transaction hash.
 
-PulsePayReceipt renders evidence supplied by the application; it does not independently verify a chain receipt. The web app reads the invoice, payment and settlement transaction before constructing receipt props. MerchantBillingDashboard is an older labeled simulation and is not used by this frontend.
+PulsePayReceipt renders evidence supplied by the application; it does not independently verify a chain receipt. The web app renders its own Svelte receipt from the invoice and payment API. The former simulation-only MerchantBillingDashboard export has been removed.
 
 ## 04 / Anatomy
 

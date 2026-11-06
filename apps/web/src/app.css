@@ -18,3 +18,20 @@
 .feature-section{isolation:auto}.ascii-field{opacity:.12}
 @media(min-width:1000px){.feature-section{display:flex;align-items:flex-start;justify-content:space-between;gap:6vw;min-height:auto}.feature-intro{width:32%;max-width:440px;position:sticky;top:120px;flex-shrink:0;background:transparent}.feature-intro h2{font-size:clamp(40px,3.7vw,60px)}.feature-grid{flex:1;margin-left:0;margin-top:0;padding:0;gap:85px 8%}.feature-entry h3{font-size:25px}}
 @media(hover:hover) and (prefers-reduced-motion:no-preference){h1,h2{font-variation-settings:"wght" 500;transition:font-variation-settings .25s ease}h1:hover,h2:hover{font-variation-settings:"wght" 540}}
+
+/* Scroll stages resize their contents without scaling text or canvas pixels. */
+@media (min-width: 900px) {
+  .hero { height: 100svh; min-height: 760px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .hero-art { width: 100%; min-width: 0; height: 100%; }
+  .ide-stage { position: relative; z-index: 4; width: 100%; max-width: 1330px; height: min(72svh, 680px); min-height: 460px; margin: auto; }
+  .ide-scroll { max-width: none; height: 100%; display: flex; flex-direction: column; }
+  .ide-scroll .ide-workspace { height: auto; flex: 1; min-height: 0; }
+  .ide-scroll .source-viewer, .ide-scroll .code-content { min-height: 0; }
+  .ide-scroll .ide-toolbar, .ide-scroll .terminal-strip { flex-shrink: 0; }
+}
+.checkout-story .token-flow { width: 100%; max-width: 1120px; height: clamp(230px, 25vw, 340px); margin: 28px auto; }
+.checkout-story .flow-labels { width: 100%; max-width: 1120px; margin-inline: auto; gap: 24px; }
+@media (max-width: 767px) {
+  .checkout-story .token-flow { height: 190px; margin-block: 20px; }
+  .flow-labels span:last-child { text-align: right; }
+}

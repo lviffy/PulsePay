@@ -460,7 +460,7 @@
 				if (units > remaining) throw new Error('Refund exceeds the remaining paid amount.');
 				confirm = {
 					title: 'Confirm reserve-backed refund',
-					description: `Send ${sum} USDT from your reserve to the original payer ${refundRow.payment.customer}. Invoice: ${refundRow.id}. Reason: ${reason || 'not supplied'}.`,
+					description: `Send ${sum} USDT from your held balance (reserve first, then available) to the original payer ${refundRow.payment.customer}. Invoice: ${refundRow.id}. Reason: ${reason || 'not supplied'}.`,
 					label: 'Issue refund',
 					run: async () => {
 						const client = await getBillingClient();

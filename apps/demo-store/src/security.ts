@@ -4,22 +4,6 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 export function equalSecret(left: string, right: string): boolean {
   return timingSafeEqual(createHash("sha256").update(left).digest(), createHash("sha256").update(right).digest());
 }
-export function escapeHtml(value: string): string {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
-}
-export function usdtUnits(value: unknown): bigint {
-  if ((typeof value !== "number" && typeof value !== "string") || !/^\d+(?:\.\d{1,6})?$/.test(String(value))) throw new Error("Amount must be a positive decimal with at most six fractional digits");
-  const [whole, fraction = ""] = String(value).split(".");
-  const units = BigInt(whole) * 1000000n + BigInt(fraction.padEnd(6, "0"));
-  if (units <= 0n || units > 1000000000000n) throw new Error("Amount must be greater than zero and at most 1,000,000 USDT");
-  return units;
-}
-export function amountNumber(units: bigint): number { return Number(units) / 1e6; }
-export function text(value: unknown, name: string, max: number): string {
-  if (typeof value !== "string" || !value.trim() || value.length > max) throw new Error(`Invalid ${name}`);
-  return value.trim();
-}
-
 export class RequestLimits {
   private readonly windows = new Map<string, { expires: number; count: number }>();
   allow(key: string, limit: number, durationMs = 60000): boolean {
