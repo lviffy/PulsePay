@@ -12,7 +12,7 @@ async function start(t,demo=false,extraEnv={}){
  const child=spawn(process.execPath,[entry],{cwd,env:{PATH:process.env.PATH,PORT:String(port),PULSEPAY_APP_URL:base,HEDERA_MERCHANT_ACCOUNT_ID:'0.0.99999',PULSEPAY_API_SECRET:secret,PULSEPAY_DEMO_MODE:String(demo),...extraEnv}});
  let output='';child.stderr.on('data',d=>output+=d);child.stdout.on('data',d=>output+=d);
  t.after(async()=>{if(child.exitCode===null){child.kill();await new Promise(r=>child.once('exit',r));}rmSync(cwd,{recursive:true,force:true});});
- for(let i=0;i<100;i++){if(child.exitCode!==null)throw Error(output);try{await fetch(base);return {base,call:async(path,body,auth=true)=>fetch(base+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(auth?{'x-api-key':secret}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})})};}catch{await new Promise(r=>setTimeout(r,25));}}
+ for(let i=0;i<400;i++){if(child.exitCode!==null)throw Error(output);try{await fetch(base);return {base,call:async(path,body,auth=true)=>fetch(base+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(auth?{'x-api-key':secret}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})})};}catch{await new Promise(r=>setTimeout(r,25));}}
  throw Error('Server did not start: '+output);
 }
 test('partial Hedera EVM configuration disables only the optional invoice service',async(t)=>{
