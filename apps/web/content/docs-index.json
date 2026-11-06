@@ -24,6 +24,14 @@
     "track": "Getting started"
   },
   {
+    "group": "Agent Skills",
+    "slug": "skills/pulsepay",
+    "title": "Install PulsePay with NPX",
+    "lede": "Equip Cursor, Claude Code, Windsurf, Copilot, or Antigravity with the PulsePay Agent Skill using NPX.",
+    "source": "skills/pulsepay/SKILL.md",
+    "track": "Skills"
+  },
+  {
     "group": "Whitechain",
     "slug": "whitechain/merchant-hub",
     "title": "One contract for the merchant ledger.",

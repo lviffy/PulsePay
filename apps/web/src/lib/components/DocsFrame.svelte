@@ -110,8 +110,8 @@
 			{/each}
 			<div class="agent-chip">
 				Agent-readable
-				<a href="/llms.txt">/llms.txt ↗</a>
-				<a href="/docs/{slug}.md">Markdown twin ↗</a>
+				<a href="/llms.txt" data-sveltekit-reload rel="external">/llms.txt ↗</a>
+				<a href="/docs/{slug}.md" data-sveltekit-reload rel="external">Markdown twin ↗</a>
 			</div>
 		</aside>
 	</div>

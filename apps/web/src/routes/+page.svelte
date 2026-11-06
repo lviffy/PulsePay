@@ -3,6 +3,7 @@
 	import type { PageData } from './$types';
 	import RepoExplorer from '$lib/components/RepoExplorer.svelte';
 	import TokenFlow from '$lib/components/TokenFlow.svelte';
+	import ProtocolBench from '$lib/components/ProtocolBench.svelte';
 	import ProceduralScenes from '$lib/components/ProceduralScenes.svelte';
 	import { gsap, ScrollTrigger } from '$lib/motion';
 
@@ -81,29 +82,10 @@
 
 		const id = window.setTimeout(() => (ready = true), 250);
 
+		let mm: gsap.MatchMedia | undefined;
 		if (scope) {
-			const mm = gsap.matchMedia();
+			mm = gsap.matchMedia();
 			mm.add('(min-width: 1000px) and (prefers-reduced-motion: no-preference)', () => {
-				gsap.to('.feature-intro', {
-					scrollTrigger: {
-						trigger: '.feature-intro',
-						start: 'top 12%',
-						endTrigger: '.feature-section',
-						end: 'bottom 80%',
-						pin: true,
-						pinSpacing: false
-					}
-				});
-				const rows = scope!.querySelectorAll('.feature-entry');
-				rows.forEach((row) => {
-					ScrollTrigger.create({
-						trigger: row,
-						start: 'center center',
-						end: '+=65',
-						pin: true,
-						pinSpacing: false
-					});
-				});
 				gsap
 					.timeline({
 						scrollTrigger: { trigger: '.cost-section', start: 'top 70%', end: 'bottom 65%', scrub: true }
@@ -125,6 +107,7 @@
 
 		return () => {
 			clearTimeout(id);
+			mm?.revert();
 		};
 	});
 </script>
@@ -158,9 +141,9 @@
 			<div class="hero-disc mono" aria-hidden="true">402</div>
 			<div class="dither-rise" aria-hidden="true"></div>
 		</div>
-		<a href="#repo" class="landing-minimap" aria-label="Jump to the repository">
+		<a href="#protocol" class="landing-minimap" aria-label="Jump to protocol verification">
 			<div class="minimap-top mono">
-				<span>PulsePay / map</span>
+				<span>PulsePay / rails</span>
 				<span>↘</span>
 			</div>
 			<TokenFlow mini={true} />
@@ -239,10 +222,11 @@
 		<a href="/docs/uniswap/universal-checkout" class="text-link mono">Read the settlement path ↗</a>
 	</section>
 
-	<section id="repo" class="repo-section section-pad">
-		<p class="eyebrow" data-decode>005 / NOTHING BEHIND THE CURTAIN</p>
-		<h2>The whole path. <br />In the actual repo.</h2>
-		<RepoExplorer files={data.files} initial={data.initial} />
+	<section id="protocol" class="repo-section section-pad">
+		<div id="repo" aria-hidden="true"></div>
+		<p class="eyebrow" data-decode>005 / THREE RAILS. LIVE VERIFICATION.</p>
+		<h2>Inspect the rails. <br />Run the machine proof.</h2>
+		<ProtocolBench />
 	</section>
 
 	<section class="final-cta section-pad">

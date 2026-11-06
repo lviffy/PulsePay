@@ -1,4 +1,4 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { getDoc, catalog } from '$lib/server/docs';
 import { renderMarkdown } from '$lib/markdown';
 import type { PageServerLoad } from './$types';
@@ -6,6 +6,9 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ params }) => {
 	const rawSlug = params.slug || 'introduction';
 	const cleanSlug = rawSlug.replace(/\.md$/, '');
+	if (cleanSlug === 'skills' || cleanSlug === 'skill' || cleanSlug === 'agent-skills') {
+		throw redirect(307, '/docs/skills/pulsepay');
+	}
 	const doc = await getDoc(cleanSlug);
 	if (!doc) {
 		throw error(404, 'Documentation page not found.');

@@ -12,8 +12,9 @@
 	<span class="mono">Payments, with a paper trail.</span>
 	<div>
 		<a href="/docs">Documentation ↗</a>
-		<a href="/llms.txt">llms.txt ↗</a>
-		<a href="/openapi.json">API ↗</a>
+		<a href="/docs/skills/pulsepay">Agent Skill ↗</a>
+		<a href="/llms.txt" data-sveltekit-reload rel="external">llms.txt ↗</a>
+		<a href="/openapi.json" data-sveltekit-reload rel="external">API ↗</a>
 	</div>
 	<small>© {new Date().getFullYear()} PulsePay · Built at ETHGlobal Mumbai</small>
 </footer>

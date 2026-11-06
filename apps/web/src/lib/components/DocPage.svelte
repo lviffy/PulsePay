@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DocsFrame from './DocsFrame.svelte';
 	import Feedback from './Feedback.svelte';
+	import SkillInstallWidget from './SkillInstallWidget.svelte';
 
 	interface Props {
 		data: {
@@ -33,7 +34,7 @@
 	<div class="track-chips">
 		<span class="track-chip">Track: {data.doc.track}</span>
 		<span class="track-chip">Source verified</span>
-		<a class="track-chip" href="/docs/{data.slug}.md">Agent readable ↗</a>
+		<a class="track-chip" href="/docs/{data.slug}.md" data-sveltekit-reload rel="external">Agent readable ↗</a>
 	</div>
 
 	<div class="before-start">
@@ -41,10 +42,16 @@
 		Node 22.13 or newer · pnpm 12.14.0 · Your configured deployment.<br />
 		{#if data.doc.group === 'Hedera'}
 			Native HBAR · asset 0.0.0. No Solidity is deployed on this track.
+		{:else if data.doc.group === 'Agent Skills' || data.slug.startsWith('skills/')}
+			NPX · Node 18+ · Compatible with Cursor, Claude Code, Windsurf, Copilot, Antigravity.
 		{:else}
 			Read the actual source and use accounts you control for wallet-authorized writes.
 		{/if}
 	</div>
+
+	{#if data.slug.startsWith('skills/') || data.doc.group === 'Agent Skills'}
+		<SkillInstallWidget />
+	{/if}
 
 	<div class="markdown-content">
 		{@html data.html}
@@ -66,20 +73,6 @@
 			</a>
 		{/if}
 	</nav>
-
-	<div class="docs-meta">
-		<a
-			href="https://github.com/lviffy/ETHGLOBAL/edit/main/apps/web/content/docs/{data.slug}.md"
-			target="_blank"
-			rel="noreferrer"
-		>
-			Edit this page ↗
-		</a>
-		<a href="/docs/{data.slug}.md">View as Markdown ↗</a>
-		<a href="https://github.com/lviffy/ETHGLOBAL/issues/new" target="_blank" rel="noreferrer">
-			Report an issue ↗
-		</a>
-	</div>
 
 	<Feedback slug={data.slug} />
 </DocsFrame>

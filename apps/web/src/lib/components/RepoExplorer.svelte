@@ -13,12 +13,13 @@
 
 	let { files, initial, pinned = false }: Props = $props();
 
-	const tabs = ['React', 'Server', 'Agent', 'Contracts'];
+	const tabs = ['React', 'Server', 'Agent', 'Contracts', 'Skill'];
 	const defaults = [
 		'packages/sdk-react/examples/checkout-page.tsx',
 		'packages/sdk-server/src/x402.ts',
 		'apps/agent-worker/src/index.ts',
-		'contracts/whitechain/src/PulsePayMerchantHub.sol'
+		'contracts/whitechain/src/PulsePayMerchantHub.sol',
+		'skills/pulsepay/SKILL.md'
 	];
 
 	type TreeNode = {
@@ -58,6 +59,7 @@
 
 	let scope = $state<HTMLDivElement | null>(null);
 	let content = $state<HTMLDivElement | null>(null);
+	const fileCache = new Map<string, SourceFile>();
 
 	async function selectFile(path: string) {
 		selected = path;
@@ -66,12 +68,19 @@
 			error = null;
 			return;
 		}
+		if (fileCache.has(path)) {
+			currentFile = fileCache.get(path)!;
+			error = null;
+			return;
+		}
 		loading = true;
 		error = null;
 		try {
 			const res = await fetch(`/source/${path}`);
 			if (!res.ok) throw new Error('Source file not found.');
-			currentFile = await res.json();
+			const data = await res.json();
+			fileCache.set(path, data);
+			currentFile = data;
 		} catch (err: any) {
 			error = err.message || 'Source read failed.';
 		} finally {
@@ -80,6 +89,19 @@
 	}
 
 	onMount(() => {
+		if (initial) fileCache.set(initial.path, initial);
+
+		const prefetchTimer = setTimeout(() => {
+			defaults.forEach(async (path) => {
+				if (!fileCache.has(path)) {
+					try {
+						const res = await fetch(`/source/${path}`);
+						if (res.ok) fileCache.set(path, await res.json());
+					} catch {}
+				}
+			});
+		}, 800);
+
 		const handleKey = (e: KeyboardEvent) => {
 			if (!(e.ctrlKey || e.metaKey) || !['k', 'j'].includes(e.key.toLowerCase())) return;
 			const bounds = scope?.getBoundingClientRect();
@@ -93,16 +115,18 @@
 		};
 		window.addEventListener('keydown', handleKey);
 
+		let mm: gsap.MatchMedia | undefined;
 		if (pinned && scope) {
-			const mm = gsap.matchMedia();
+			mm = gsap.matchMedia();
 			mm.add('(min-width: 1000px) and (prefers-reduced-motion: no-preference)', () => {
 				ScrollTrigger.create({
 					trigger: scope,
 					start: 'top 12%',
 					end: '+=850',
 					pin: true,
+					anticipatePin: 1,
 					onUpdate: (self) => {
-						const idx = Math.min(3, Math.floor(self.progress * 4));
+						const idx = Math.min(4, Math.floor(self.progress * 5));
 						if (defaults[idx] && selected !== defaults[idx]) {
 							selectFile(defaults[idx]);
 						}
@@ -112,7 +136,9 @@
 		}
 
 		return () => {
+			clearTimeout(prefetchTimer);
 			window.removeEventListener('keydown', handleKey);
+			mm?.revert();
 		};
 	});
 

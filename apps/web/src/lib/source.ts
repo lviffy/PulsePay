@@ -46,7 +46,8 @@ export async function getSourceFiles(): Promise<SourceFile[]> {
 		...(await walk('packages')),
 		...(await walk('contracts/whitechain/src')),
 		...(await walk('contracts/uniswap-v4/src')),
-		'apps/agent-worker/src/index.ts'
+		'apps/agent-worker/src/index.ts',
+		'skills/pulsepay/SKILL.md'
 	];
 
 	const validPaths = basePaths.filter((p) => existsSync(resolve(repoRoot, p)));

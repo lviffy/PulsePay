@@ -282,7 +282,7 @@
 
 		let last = 0;
 		const unsubscribe = onFrame((time) => {
-			if (time - last < 1 / 30 || !visible.size) return;
+			if (!visible.size) return;
 			const delta = Math.min(time - last, 0.1);
 			last = time;
 

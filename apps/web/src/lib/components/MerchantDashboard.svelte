@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import {
 		createWalletClient,
 		custom,
@@ -79,6 +80,7 @@
 	let addressInput = $state('');
 	let wallet = $state<WalletClient | null>(null);
 	let chain = $state<'whitechain' | 'hedera'>('whitechain');
+	let lastWhitechainSection = $state('invoices');
 	let filter = $state('');
 	let before = $state<string | undefined>();
 
@@ -219,20 +221,23 @@
 
 	onMount(() => {
 		fetchConfig().then(() => {
-			fetchMerchantData();
+			if (chain === 'whitechain') fetchMerchantData();
 		});
 		if (section === 'agents') {
 			chain = 'hedera';
 			fetchAudit();
 			fetchManifest();
-		}
-		if (section === 'treasury') {
+		} else if (section === 'treasury') {
+			chain = 'whitechain';
 			fetchTreasury();
+		} else if (section !== 'settings') {
+			chain = 'whitechain';
+			lastWhitechainSection = section;
 		}
 	});
 
 	$effect(() => {
-		if (merchant && chain === 'whitechain') {
+		if (merchant && chain === 'whitechain' && !['settings', 'agents'].includes(section)) {
 			fetchMerchantData();
 		}
 	});
@@ -242,10 +247,35 @@
 			chain = 'hedera';
 			fetchAudit();
 			fetchManifest();
-		} else if (section === 'treasury') {
-			fetchTreasury();
+		} else if (section === 'settings') {
+			// Settings displays cross-chain configurations; keep current chain
+		} else {
+			chain = 'whitechain';
+			lastWhitechainSection = section;
+			if (section === 'treasury') {
+				fetchTreasury();
+			}
 		}
 	});
+
+	function selectChain(target: 'whitechain' | 'hedera') {
+		if (target === chain) return;
+		chain = target;
+		if (target === 'hedera') {
+			if (section !== 'agents' && section !== 'settings') {
+				goto('/merchant/agents');
+			} else {
+				fetchAudit();
+				fetchManifest();
+			}
+		} else {
+			if (section === 'agents') {
+				goto(`/merchant/${lastWhitechainSection || 'invoices'}`);
+			} else if (merchant) {
+				fetchMerchantData();
+			}
+		}
+	}
 
 	function saveAddress(addr: string) {
 		if (!isAddress(addr)) throw new Error('Enter a valid EVM merchant address.');
@@ -339,13 +369,36 @@
 
 	async function exportCsv() {
 		try {
+			if (chain === 'hedera') {
+				if (!auditData?.entries || auditData.entries.length === 0) {
+					throw new Error('No Hedera audit entries loaded to export.');
+				}
+				const header = ['sequence_number', 'consensus_timestamp', 'payer', 'event', 'amount_tinybars'];
+				const rows = auditData.entries.map((entry) => [
+					entry.sequence_number,
+					entry.consensus_timestamp,
+					entry.payer_account_id,
+					entry.payload.event || entry.payload.tool || 'MESSAGE',
+					entry.payload.result?.amountTinybars || ''
+				]);
+				const csvContent = [
+					header.join(','),
+					...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+				].join('\n');
+				const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+				const url = URL.createObjectURL(blob);
+				const link = document.createElement('a');
+				link.href = url;
+				link.download = `pulsepay-hedera-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+				document.body.appendChild(link);
+				link.click();
+				link.remove();
+				setTimeout(() => URL.revokeObjectURL(url), 1000);
+				return;
+			}
+
 			if (!isAddress(merchant)) {
 				throw new Error('Choose a merchant address in Settings before exporting.');
-			}
-			if (chain === 'hedera') {
-				throw new Error(
-					'This exporter covers Whitechain settlement events. Verified Hedera CSV is available from the authenticated paid API’s /api/export.csv endpoint.'
-				);
 			}
 			const response = await fetch(
 				`/api/export?merchant=${merchant}${before ? `&before=${before}` : ''}`
@@ -494,16 +547,40 @@
 </svelte:head>
 
 <main id="main" class="merchant-shell">
-	<aside class="merchant-rail">
+	<aside class="merchant-rail" data-lenis-prevent>
 		<a href="/" class="brand">
 			<Mark />PulsePay
 		</a>
 		<nav aria-label="Merchant navigation">
-			{#each sections as item (item)}
-				<a href="/merchant/{item}" aria-current={item === section ? 'page' : undefined}>
-					{item}
-				</a>
-			{/each}
+			<div class="rail-group-title mono">Whitechain</div>
+			<a href="/merchant/invoices" aria-current={section === 'invoices' ? 'page' : undefined}>
+				invoices
+			</a>
+			<a href="/merchant/payments" aria-current={section === 'payments' ? 'page' : undefined}>
+				payments
+			</a>
+			<a href="/merchant/refunds" aria-current={section === 'refunds' ? 'page' : undefined}>
+				refunds
+			</a>
+			<a href="/merchant/subscriptions" aria-current={section === 'subscriptions' ? 'page' : undefined}>
+				subscriptions
+			</a>
+			<a href="/merchant/treasury" aria-current={section === 'treasury' ? 'page' : undefined}>
+				treasury
+			</a>
+			<a href="/merchant/exports" aria-current={section === 'exports' ? 'page' : undefined}>
+				exports
+			</a>
+
+			<div class="rail-group-title mono">Hedera</div>
+			<a href="/merchant/agents" aria-current={section === 'agents' ? 'page' : undefined}>
+				agents
+			</a>
+
+			<div class="rail-group-title mono">General</div>
+			<a href="/merchant/settings" aria-current={section === 'settings' ? 'page' : undefined}>
+				settings
+			</a>
 		</nav>
 		<div class="rail-bottom">
 			<span><i class="status-dot"></i> Wallet-authorized writes</span>
@@ -548,18 +625,14 @@
 					<button
 						role="tab"
 						aria-selected={chain === 'whitechain'}
-						onclick={() => (chain = 'whitechain')}
+						onclick={() => selectChain('whitechain')}
 					>
 						Whitechain
 					</button>
 					<button
 						role="tab"
 						aria-selected={chain === 'hedera'}
-						onclick={() => {
-							chain = 'hedera';
-							fetchAudit();
-							fetchManifest();
-						}}
+						onclick={() => selectChain('hedera')}
 					>
 						Hedera
 					</button>
@@ -615,7 +688,7 @@
 			</div>
 		{/if}
 
-		{#if chain === 'hedera'}
+		{#if section === 'agents' || (chain === 'hedera' && section !== 'settings')}
 			<div class="merchant-panel">
 				<p class="eyebrow">Actual service discovery / SDK server</p>
 				<h2>Agents read the terms first.</h2>
@@ -757,8 +830,6 @@
 				Deployment settings are read from the server’s root .env. Public wallet selection is saved on
 				this device. No signing keys are stored in this frontend.
 			</p>
-		{:else if section === 'agents'}
-			<!-- Handled by chain === 'hedera' -->
 		{:else if section === 'treasury'}
 			<section class="merchant-panel">
 				<h2>Reserve & available balance.</h2>
@@ -999,7 +1070,7 @@
 			</DataTable>
 		{/if}
 
-		{#if chain === 'whitechain' && remoteData}
+		{#if chain === 'whitechain' && remoteData && !['settings', 'agents'].includes(section)}
 			<div class="table-toolbar">
 				<p class="merchant-notice">
 					Event window: {remoteData.fromBlock}–{remoteData.block}. Balances are current; gross and refunded
