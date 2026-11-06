@@ -6,12 +6,20 @@ This page follows the implementation in `packages/adapter-whitechain/src/client.
 
 ## 02 / Quickstart
 
+Install `@pulsepay/adapter-whitechain` from the npm registry:
+
+```bash
+npm install @pulsepay/adapter-whitechain viem
+```
+
+For workspace developers building and testing from source:
+
 ```bash
 pnpm --filter @pulsepay/adapter-whitechain build
 pnpm --filter @pulsepay/adapter-whitechain test
 ```
 
-Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use. Foundry is required for contract tests. Read-only browsing does not require signing keys.
+Published as [`@pulsepay/adapter-whitechain` on npm](https://www.npmjs.com/package/@pulsepay/adapter-whitechain). Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use. Foundry is required for contract tests. Read-only browsing does not require signing keys.
 
 ## 03 / Walkthrough
 

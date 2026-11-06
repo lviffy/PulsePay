@@ -6,13 +6,25 @@ This page follows the implementation in `README.md`. The source explorer on the 
 
 ## 02 / Quickstart
 
+### Install via npm
+
+To add PulsePay directly to an existing application:
+
+```bash
+npm install @pulsepay/sdk-core @pulsepay/sdk-react viem
+# or using pnpm:
+pnpm add @pulsepay/sdk-core @pulsepay/sdk-react viem
+```
+
+### Run the workspace locally
+
 ```bash
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm build
 pnpm --filter @pulsepay/web dev
 ```
 
-Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use.
+Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use. All `@pulsepay/*` packages are also published on the [npm registry](https://www.npmjs.com/search?q=%40pulsepay).
 
 ## 03 / Walkthrough
 

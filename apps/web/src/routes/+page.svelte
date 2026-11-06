@@ -4,6 +4,7 @@
 	import RepoExplorer from '$lib/components/RepoExplorer.svelte';
 	import TokenFlow from '$lib/components/TokenFlow.svelte';
 	import SkillInstallWidget from '$lib/components/SkillInstallWidget.svelte';
+	import SdkInstallWidget from '$lib/components/SdkInstallWidget.svelte';
 	import ProceduralScenes from '$lib/components/ProceduralScenes.svelte';
 	import { gsap, ScrollTrigger } from '$lib/motion';
 
@@ -168,6 +169,7 @@
 		<div class="dither-band" aria-hidden="true"></div>
 		<p class="eyebrow" data-decode>001 / THE SDK</p>
 		<h2>One component to a<br class="mobile-break" /> live checkout.</h2>
+		<SdkInstallWidget />
 		<RepoExplorer files={data.files} initial={data.initial} pinned={true} />
 		<p class="section-note mono">Real files from this monorepo. Read, copy, build.</p>
 	</section>

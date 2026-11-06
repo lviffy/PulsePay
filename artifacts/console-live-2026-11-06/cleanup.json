@@ -1,0 +1,14 @@
+{
+  "originalAllowance": "0",
+  "currentAllowance": "9000",
+  "transaction": {
+    "hash": "0x40da40a05f81cce5ef82c465574c649ee9b661a2c5a55781e5ccc67ed4b73f5c",
+    "function": "approve",
+    "status": "success",
+    "origin": "cleanup: restore original allowance",
+    "block": "12366175",
+    "gasUsed": "31440",
+    "effectiveGasPrice": "5001000000"
+  },
+  "restoredAllowance": "0"
+}

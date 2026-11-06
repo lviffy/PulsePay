@@ -6,11 +6,21 @@ This page follows the implementation in `packages/sdk-core/src/index.ts`. The so
 
 ## 02 / Quickstart
 
+Install `@pulsepay/sdk-core` from the npm registry:
+
+```bash
+npm install @pulsepay/sdk-core viem
+# or with pnpm
+pnpm add @pulsepay/sdk-core viem
+```
+
+For workspace developers building from source:
+
 ```bash
 pnpm --filter @pulsepay/sdk-core build
 ```
 
-Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use.
+Published as [`@pulsepay/sdk-core` on npm](https://www.npmjs.com/package/@pulsepay/sdk-core). Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use.
 
 ## 03 / Walkthrough
 

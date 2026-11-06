@@ -6,11 +6,19 @@ This page follows the implementation in `packages/adapter-uniswap/src/routing.ts
 
 ## 02 / Quickstart
 
+Install `@pulsepay/adapter-uniswap` from the npm registry:
+
+```bash
+npm install @pulsepay/adapter-uniswap viem
+```
+
+For workspace developers running tests:
+
 ```bash
 pnpm --filter @pulsepay/adapter-uniswap test
 ```
 
-Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use. Foundry is required for contract tests. Read-only browsing does not require signing keys.
+Published as [`@pulsepay/adapter-uniswap` on npm](https://www.npmjs.com/package/@pulsepay/adapter-uniswap). Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use. Foundry is required for contract tests. Read-only browsing does not require signing keys.
 
 ## 03 / Walkthrough
 
