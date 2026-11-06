@@ -27,7 +27,7 @@
     "pulsepay",
     "sdk",
     "whitechain",
-    "uniswap",
+    "ccip",
     "hedera",
     "x402",
     "web3-payments",
@@ -40,7 +40,7 @@
   "dependencies": {
     "@pulsepay/shared": "workspace:*",
     "@pulsepay/adapter-whitechain": "workspace:*",
-    "@pulsepay/adapter-uniswap": "workspace:*"
+    "@pulsepay/adapter-ccip": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.3"

@@ -1,4 +1,4 @@
-export type ChainKey = "whitechain" | "uniswap" | "hedera";
+export type ChainKey = "whitechain" | "ccip" | "hedera";
 
 export type InvoiceStatus = "OPEN" | "PAID" | "EXPIRED" | "CANCELLED";
 export type PaymentStatus = "PAID" | "PARTIALLY_REFUNDED" | "FULLY_REFUNDED";
@@ -48,15 +48,30 @@ export interface Subscription {
   active: boolean;
 }
 
-export interface SwapQuote {
-  chainId?: number;
-  inputToken: string;
-  inputAmount: string;
-  outputToken: string;
-  outputAmount: string;
-  estimatedGas: string;
-  slippageTolerance: number;
-  route: string;
+export interface BridgeQuote {
+  sourceChainId: number;
+  destinationChainSelector: string; // stringified bigint
+  token: `0x${string}`;
+  amountUnits: string;
+  recipient: `0x${string}`;
+  feeToken: `0x${string}`; // address(0) for native
+  feeUnits: string;
+  estimatedGas?: string;
+  sourcePool?: `0x${string}`;
+  destinationToken?: `0x${string}`;
+}
+
+export interface BridgeTransactionPayload {
+  to: `0x${string}`;
+  data: `0x${string}`;
+  value: bigint;
+  /** Execute and confirm this fee approval before ccipSend, when present. */
+  feeApprovalTx?: { to: `0x${string}`; data: `0x${string}`; value: 0n };
+  approvalTx?: {
+    to: `0x${string}`;
+    data: `0x${string}`;
+    value: 0n;
+  };
 }
 
 export interface AgentSpendPolicy {
@@ -88,9 +103,8 @@ export interface NormalizedActivity {
     | "SUBSCRIPTION_RENEWED"
     | "AGENT_SPEND_SETTLED"
     | "AGENT_REFUND_SETTLED"
-    | "TREASURY_SWAP"
-    | "TREASURY_LP_UPDATED"
-    | "TREASURY_SWEEP";
+    | "CCIP_BRIDGE_INITIATED"
+    | "CCIP_BRIDGE_DELIVERED";
   from: string;
   to: string;
   asset: string;
@@ -102,4 +116,3 @@ export interface NormalizedActivity {
   timestamp: number;
   metadata?: Record<string, unknown>;
 }
-

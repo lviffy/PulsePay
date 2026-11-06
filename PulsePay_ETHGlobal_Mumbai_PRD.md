@@ -4,7 +4,6 @@
 > **Package:** `@pulsepay/sdk`  
 > **Product category:** Business payments, subscription billing, agentic commerce and onchain treasury tooling  
 > **Hackathon:** ETHGlobal Mumbai 2026  
-> **Primary target tracks:** Whitechain — Operate · Stablecoin Payments for Business; Hedera — AI Agents That Pay: x402 on Hedera; Uniswap Foundation — Build with Uniswap  
 > **Optional bonus:** Hedera — “No Solidity Allowed”: Build with Hedera SDKs  
 > **Document status:** Build-ready product and technical specification  
 > **Version:** 1.0 — 5 November 2026
@@ -20,35 +19,29 @@
 A SaaS company, online store, API provider or digital service can integrate PulsePay to:
 
 1. **Accept stablecoin payments from people** through checkout pages, payment links and invoices on Whitechain.
-2. **Accept payment in any token via Uniswap ("Pay With Any Token")**, allowing customers to pay with ETH, USDC, or other ERC-20 assets while the merchant always receives the exact USDT requested.
 3. **Run recurring subscriptions** with customer-authorized token pulls, renewal handling and an obvious cancel-anytime control.
 4. **Issue full or partial refunds** from a merchant dashboard, with a receipt the customer can independently verify.
 5. **Sell APIs and tools to AI agents** using x402 on Hedera, so an agent can discover a service, receive a price quote, authorize a payment and access the service without a human completing checkout.
 6. **Control the money AI agents spend** through per-request limits, daily budgets, merchant allowlists and an emergency stop.
 7. **Keep an auditable business ledger** that combines payment, refund, subscription, agent-spend and treasury events.
-8. **Manage a separate onchain treasury position through Uniswap v4**, including swaps, liquidity provision and merchant-defined risk controls enforced by a custom hook.
 
 PulsePay is not three unrelated demos joined by a dashboard. It is one business-finance SDK with three chain-specific execution adapters:
 
 - **Whitechain is the human billing and merchant-receivables rail.**
 - **Hedera is the machine-to-machine payment and agent-spending rail.**
-- **Uniswap is the universal token-conversion ("Pay With Any Token") and treasury liquidity rail.**
 
 The SDK presents one merchant experience and one normalized transaction history while preserving each network's settlement rules.
 
 ### 1.2 One-line pitch
 
-> **PulsePay gives businesses one SDK to accept payments in any token via Uniswap, bill customers on Whitechain, get paid by AI agents, issue verifiable refunds and manage onchain treasury operations.**
 
 ### 1.3 The core demonstration
 
 A fictional SaaS company called **Acme Studio** sells a $20/month Pro plan and provides a paid data API.
 
-- A human customer subscribes to Pro; holding WETH instead of USDT, they use **Pay With Any Token**, routing through Uniswap so Acme receives exact USDT settled on the merchant hub.
 - The merchant issues a $5 partial refund from the merchant dashboard. The customer opens a receipt page and verifies the original payment and refund on the Whitechain explorer.
 - An AI research agent discovers Acme's paid API, receives an x402 payment requirement, pays in HTS USDC on Hedera through a facilitator, and receives the API result without a human approving the request.
 - The merchant dashboard records the agent spend in an HCS audit topic.
-- The merchant opens Treasury and uses Uniswap v4 on a supported v4 network to swap a test asset and manage a liquidity position through a custom business-policy hook.
 
 That sequence tells one coherent story: **a business can sell to humans and agents, handle what happens after payment, and operate its treasury using onchain infrastructure.**
 
@@ -62,7 +55,6 @@ The three target tracks have different judging expectations. PulsePay must demon
 | ------------------------------------------------------- | -------------------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Whitechain — Operate · Stablecoin Payments for Business |                           $5,000 | Merchant checkout, invoices, subscriptions, one-click partial/full refunds and customer-verifiable receipts                                                                  | A real payment in the official Whitechain Sepolia USDT; verified Whitechain contract; merchant and customer views; drop-in SDK                                                                                                                                    |
 | Hedera — AI Agents That Pay: x402 on Hedera             |                           $6,500 | Agent discovers a paid service and completes a paid request autonomously through x402 on Hedera                                                                              | At least one x402-protected endpoint; one end-to-end payment with no human approval; Hedera transaction ID and HashScan link; spending controls and HCS audit                                                                                                     |
-| Uniswap Foundation — Build with Uniswap                 |                          $10,000 | Universal "Pay With Any Token" checkout via Uniswap swap routing, plus a meaningful Uniswap v4 business treasury integration (swaps/liquidity with custom TreasuryGuardHook) | Real checkout demo paying with an alternative token (e.g., WETH) swapped seamlessly into invoice USDT; actual v4 pool interaction, deployed hook, swap/liquidity transaction evidence, source code clearly identified, `FEEDBACK.md` and feedback form submission |
 
 **Core prize-pool total across these three targets: $21,500.** These are prize pools, not guaranteed winnings.
 
@@ -86,7 +78,6 @@ This is an optional additional target. Do not let it delay the three core track 
 | Is this a real business product? | A separate demo store integrates the SDK; a merchant can create an invoice, collect payment, manage subscriptions and issue refunds                                                |
 | Does Whitechain actually matter? | Official Whitechain USDT settles the main checkout; the receipt and contract state are verifiable on Whitechain                                                                    |
 | Is the Hedera agent autonomous?  | A running agent discovers the endpoint, handles the 402 response, signs the payment payload, gets facilitator settlement and receives the protected resource without a human click |
-| Is Uniswap genuinely integrated? | Customer checkout can pay with any token auto-swapped to invoice USDT via Uniswap; real v4 treasury pool with deployed hook callback enforcing business policy                     |
 | Is the product coherent?         | All three flows appear in one merchant ledger with chain, asset, amount, status, transaction link and event type                                                                   |
 | Is it complete?                  | The README, public repository, feedback files, explorer/HashScan links, setup steps and demo video are all present                                                                 |
 
@@ -172,12 +163,10 @@ A business may accept stablecoins in one place, swap assets in another and provi
 
 **PulsePay solution**
 
-- PulsePay provides a Uniswap v4 treasury adapter on a network where Uniswap v4 is deployed.
 - A merchant can quote and execute supported token swaps and manage a v4 liquidity position.
 - A custom v4 hook enforces onchain treasury rules such as pause state and maximum swap size, and emits verifiable events.
 - The unified dashboard records the treasury action alongside the merchant's other financial events.
 
-**Important network boundary:** Whitechain Sepolia and Uniswap's v4 testnet deployment are different networks. The hackathon MVP must not claim that Whitechain revenue is automatically swept into a Uniswap pool. The Uniswap module manages assets already deposited on its own supported network. A future bridge/cross-chain messaging adapter could connect those balances, but that is outside the MVP.
 
 ### Problem 6 — Single-currency checkout friction ("I want to pay, but I hold a different token")
 
@@ -187,10 +176,7 @@ Merchants prefer to invoice and settle in stablecoins like USDT to avoid price v
 
 **PulsePay solution**
 
-- PulsePay embeds a **"Pay With Any Token"** flow powered by Uniswap's Universal Router / swap routing into the checkout experience.
 - When a customer connects their wallet to pay an invoice, PulsePay reads the customer's available token balances.
-- If the customer does not have enough invoice currency (e.g., USDT), PulsePay queries Uniswap for real-time swap quotes from alternative tokens (e.g., WETH -> USDT).
-- The customer authorizes a single checkout action: Uniswap executes the swap to the exact invoice amount, and the output USDT is routed directly into the merchant's payment contract.
 - The merchant receives the exact stablecoin requested, while the customer pays with whatever asset they prefer.
 
 **Outcome:** Frictionless universal checkout conversion without forcing merchants to accept volatile asset risk.
@@ -204,17 +190,14 @@ Merchants prefer to invoice and settle in stablecoins like USDT to avoid price v
 1. Ship a genuinely reusable TypeScript SDK, not a one-off demo frontend.
 2. Make a separate demo business integrate a basic checkout in approximately 20 lines.
 3. Demonstrate the entire Whitechain payment lifecycle: invoice, payment, refund, receipt and at least one subscription lifecycle action.
-4. Enable "Pay With Any Token" checkout conversion powered by Uniswap, allowing users to pay with alternative assets seamlessly converted to invoice USDT.
 5. Demonstrate at least one fully settled Hedera x402 payment initiated by an autonomous agent.
 6. Add meaningful agent spending controls and an HCS audit trail.
-7. Demonstrate a real Uniswap v4 integration, including a custom hook enforcing business treasury policies (`TreasuryGuardHook`) or a clearly verifiable v4 stack integration.
 8. Keep all chain-specific details behind adapters while showing a unified merchant ledger.
 9. Make every major transaction independently verifiable through the relevant explorer or HashScan.
 
 ### 4.2 Non-goals for the hackathon MVP
 
 - Fiat on/off ramps or conversion into a local currency.
-- A bridge from Whitechain to Unichain, Base or another v4 network.
 - A promise of fixed or risk-free yield.
 - A generic replacement for Stripe, Shopify or a full accounting platform.
 - A new stablecoin.
@@ -235,7 +218,6 @@ Merchants prefer to invoice and settle in stablecoins like USDT to avoid price v
 | API provider            | Charge for usage without issuing API keys or handling manual invoices    | x402 gateway middleware and service manifest                      |
 | Autonomous buyer agent  | Discover services, compare prices and pay safely                         | Agent directory client, x402 client and budget policy engine      |
 | Business operator / CFO | Control spending and reconcile transactions                              | Agent policies, event ledger, HCS audit and CSV export            |
-| Treasury manager        | Swap approved assets and manage LP exposure                              | Uniswap v4 treasury screen and hook-enforced rules                |
 
 ---
 
@@ -259,23 +241,6 @@ Merchants prefer to invoice and settle in stablecoins like USDT to avoid price v
 - The contract event includes a stable invoice ID and the relevant parties.
 - The merchant's view and customer's view show the same settlement status.
 - The README includes the real transaction explorer link.
-
-### 6.1b Journey A2 — Customer pays an invoice with any token via Uniswap ("Pay With Any Token")
-
-1. Merchant creates an invoice requesting 20 USDT.
-2. Customer opens checkout and connects a wallet, but holds an alternative asset (e.g. WETH or USDC) rather than USDT.
-3. The checkout UI queries Uniswap's swap routing / Trading API in real time to fetch quotes for converting customer assets into exactly 20 USDT.
-4. The customer chooses "Pay with WETH" (e.g., quote shows 0.0078 WETH, including estimated gas and slippage).
-5. Customer submits the checkout transaction. Uniswap routes and executes the swap, and the resulting 20 USDT is deposited directly to the merchant hub contract to fulfill the invoice.
-6. The contract records the payment as fully settled; the merchant receives USDT without handling volatile token exposure.
-7. The customer receipt displays both the original asset paid (0.0078 WETH), the Uniswap swap transaction link, and the settled USDT invoice receipt.
-
-**Acceptance criteria**
-
-- Real-time Uniswap quote displays expected input amount and slippage bounds.
-- Merchant hub contract receives the exact required USDT invoice amount.
-- Invoice status advances to `PAID` identically to a direct USDT payment.
-- The customer receipt captures the token swap route and explorer transaction references.
 
 ### 6.2 Journey B — Subscription signup, renewal and cancellation on Whitechain
 
@@ -308,7 +273,6 @@ Merchants prefer to invoice and settle in stablecoins like USDT to avoid price v
 - Remaining funds are merchant-withdrawable only under the contract's balance accounting.
 - A refund may draw from the reserve and, where policy allows, still-held merchant proceeds.
 - If the merchant already withdrew funds and the reserve is insufficient, the refund must not pretend to succeed. The UI asks the merchant to top up the refund reserve or available balance.
-- Do not claim that Uniswap liquidity can be pulled atomically from another chain to cover this refund.
 
 ### 6.4 Journey D — AI agent discovers and pays for an API using Hedera x402
 
@@ -348,20 +312,6 @@ A refund is **not an x402 reversal primitive**. It is a new, separately settled 
 
 This is a Hedera extra-credit capability. The MVP may use a deterministic policy engine; LLM-based reasoning is optional and must never be the only enforcement layer.
 
-### 6.7 Journey G — Merchant manages treasury with Uniswap v4
-
-1. Merchant selects the configured Uniswap v4 network in the Treasury screen.
-2. Merchant connects a wallet and sees supported pool and token metadata.
-3. Merchant obtains a quote through the Uniswap API/SDK or approved v4 routing path.
-4. Merchant swaps an approved amount or adds liquidity to a configured v4 pool.
-5. The custom `TreasuryGuardHook` enforces the pool's merchant-defined controls, such as paused state and maximum swap size.
-6. `afterSwap` emits a business treasury event containing the pool and swap delta context.
-7. Merchant sees the swap transaction, liquidity position and available onchain evidence in PulsePay.
-
-**Network boundary:** Whitechain Sepolia (chain ID 1874) and Unichain Sepolia (chain ID 1301) are separate networks. The MVP does not move Whitechain USDT into the Uniswap pool. Treasury assets must already be on the Uniswap-supported network.
-
----
-
 ## 7. Functional Requirements
 
 Priority definitions:
@@ -379,7 +329,6 @@ Priority definitions:
 | MER-03 | Merchant can enable Whitechain checkout and provide a verified contract configuration |       P0 | Wrong chain/token/contract configuration is rejected      |
 | MER-04 | Merchant can publish at least one paid agent service                                  |       P0 | Service is returned by the directory and manifest         |
 | MER-05 | Merchant can connect a Hedera account and create/select an HCS audit topic            |       P0 | Topic ID is visible in workspace                          |
-| MER-06 | Merchant can configure a Uniswap v4 treasury network and token pair                   |       P1 | Treasury view displays network and pool configuration     |
 | MER-07 | Merchant can configure a refund reserve target                                        |       P1 | Reserve percentage is visible and applied by the contract |
 
 ### 7.2 Whitechain checkout, invoices and payment links
@@ -394,7 +343,6 @@ Priority definitions:
 | WH-06 | Merchant can view paid, unpaid, expired and refunded invoices                       |       P0 | Dashboard status matches contract state                                 |
 | WH-07 | Merchant can configure order metadata and receive a webhook                         |       P1 | Webhook is delivered with signature and retry record                    |
 | WH-08 | Customer can view a receipt without trusting the merchant's database                |       P0 | Receipt reads or verifies onchain state and links to explorer           |
-| WH-09 | Customer can pay invoice with alternative tokens via Uniswap ("Pay With Any Token") |       P0 | Real-time quote shows input amount; Uniswap swaps to exact invoice USDT |
 
 ### 7.3 Whitechain subscriptions and renewals
 
@@ -451,28 +399,10 @@ Priority definitions:
 | AG-08 | HCS audit record can be queried and verified             |       P0 | Dashboard links topic and message/transaction evidence                |
 | AG-09 | Merchant can export audit and payment records as CSV     |       P1 | CSV contains chain, token, amount, status, time, tx ID and event type |
 
-### 7.7 Uniswap — Pay With Any Token and v4 Treasury
-
-| ID         | Requirement                                                          | Priority | Acceptance criteria                                                            |
-| ---------- | -------------------------------------------------------------------- | -------: | ------------------------------------------------------------------------------ |
-| UNI-PAY-01 | Real-time quote for paying an invoice with alternative ERC-20 tokens |       P0 | Quote accurately reflects input token amount, price impact and slippage bounds |
-| UNI-PAY-02 | Execute swap-and-pay routing through Uniswap                         |       P0 | Swaps customer token to exact invoice USDT and settles invoice                 |
-| UNI-01     | Treasury adapter connects to an officially supported v4 testnet      |       P0 | Config references the official deployment addresses for that network           |
-| UNI-02     | Merchant can query a swap quote                                      |       P0 | Quote includes input, output, slippage and route/network context               |
-| UNI-03     | Merchant can execute a real Uniswap v4 swap                          |       P0 | Transaction is confirmed and linked in the dashboard                           |
-| UNI-04     | Merchant can add and remove liquidity from a v4 position             |       P1 | Position Manager interaction is verifiable                                     |
-| UNI-05     | A custom v4 hook is deployed and attached to a pool                  |       P0 | Pool key references the hook address                                           |
-| UNI-06     | Hook enforces emergency pause and maximum swap size                  |       P0 | Oversized/paused swap reverts                                                  |
-| UNI-07     | Hook emits a treasury event after a swap                             |       P0 | Event includes pool and observed swap context                                  |
-| UNI-08     | Merchant can configure policy within safe bounds                     |       P1 | Only authorized owner/role can update settings                                 |
-| UNI-09     | Dashboard displays liquidity position and fee-related information    |       P1 | Values are labeled as estimates/current position data, not guaranteed yield    |
-| UNI-10     | Treasury operations appear in unified activity ledger                |       P0 | Swap/liquidity events have chain, tx ID and status                             |
-
 ### 7.8 Unified ledger, receipts and exports
 
 | ID     | Requirement                                                                           | Priority | Acceptance criteria                                                      |
 | ------ | ------------------------------------------------------------------------------------- | -------: | ------------------------------------------------------------------------ |
-| LED-01 | All chain events map to one normalized activity model                                 |       P0 | Whitechain, Hedera and Uniswap activities use the same display structure |
 | LED-02 | Each record stores network, asset, amount, sender, recipient, status and tx reference |       P0 | Missing chain-specific fields are nullable, not fabricated               |
 | LED-03 | Settled status is based on chain/facilitator evidence                                 |       P0 | Client-side "success" alone never settles a record                       |
 | LED-04 | Merchant can filter activity by chain, type and status                                |       P1 | Filters work across all adapters                                         |
@@ -489,13 +419,6 @@ The SDK should be modular so an EVM-only merchant does not need to install Heder
 
 Proposed package structure:
 
-```text
-@pulsepay/sdk
-@pulsepay/react
-@pulsepay/server
-@pulsepay/hedera
-@pulsepay/uniswap
-```
 
 ### 8.2 Proposed SDK API
 
@@ -748,7 +671,6 @@ For the demo, configure a default reserve percentage (for example, 20%) and make
 - Merchant can top up the reserve.
 - If reserve plus still-held proceeds are insufficient, the refund reverts with a clear error. The dashboard must not show a pending refund as completed.
 
-This gives the judge a real, testable reserve-backed refund flow without pretending that a separate Uniswap pool can atomically fund a Whitechain refund.
 
 ### Whitechain integration checklist
 
@@ -969,62 +891,8 @@ x402 is non-reversible; refunds are executed as native HBAR transfers (`Transfer
 
 ---
 
-## 9.3 Uniswap Foundation — Build with Uniswap
-
-### Purpose
-
-Uniswap powers PulsePay at two foundational layers:
-
-1. **The Checkout Layer ("Pay With Any Token"):** Universal payment conversion allowing buyers to pay invoices with any token in their wallet, routed seamlessly through Uniswap into the merchant's requested stablecoin.
-2. **The Treasury Layer:** Active business treasury token conversion, liquidity management, and risk-policy enforcement via a custom Uniswap v4 hook.
-
-It must be a real integration with Uniswap protocol infrastructure, not merely a link to the Uniswap website or an unused hook contract.
-
-### 9.3.1 Universal Checkout: "Pay With Any Token"
-
-Merchants want predictable revenue in stablecoins (e.g., USDT), but customers frequently hold other assets such as ETH, WETH, USDC, or ecosystem tokens. PulsePay incorporates Uniswap's swap routing into the checkout SDK:
-
-1. **Token Discovery:** When a customer opens checkout, the SDK reads available tokens in the connected wallet.
-2. **Real-time Routing Quote:** If the customer selects a non-USDT asset (e.g. WETH), the SDK queries Uniswap (via Trading API or Universal Router) for the exact input amount required to yield the specified invoice USDT amount, factoring in slippage tolerance.
-3. **Atomic Execution:** The customer executes the payment. Uniswap routes the swap, and the exact output USDT is transferred directly into the merchant hub payment contract to settle the invoice.
-4. **Transparent Audit:** The resulting customer receipt logs both the input asset paid, the Uniswap swap transaction reference, and the settled USDT invoice.
-
-### 9.3.2 Product module: PulsePay Treasury
-
-The merchant treasury module provides:
-
-1. **Swap quote:** Retrieve a quote for an approved token pair using the Uniswap API/SDK.
-2. **Swap execution:** Execute a real swap through an official Uniswap router path.
-3. **Liquidity provisioning:** Add or remove liquidity from a v4 pool.
-4. **Pool visibility:** Read pool, price, token and position information.
-5. **Policy enforcement:** Use a custom hook to enforce merchant-defined trading controls.
-6. **Unified event history:** Record the treasury transaction in the same normalized PulsePay ledger.
-
-### Custom hook: `TreasuryGuardHook.sol`
-
-The hook exists to protect a business treasury pool, not to promise yield or magically transfer money between chains.
-
-#### MVP hook behaviour
-
-| Hook feature      | Behaviour                                                                                                |
-| ----------------- | -------------------------------------------------------------------------------------------------------- |
-| Emergency pause   | Authorized merchant/guardian can pause swaps for the attached pool                                       |
-| Maximum swap size | `beforeSwap` rejects a trade above the configured maximum input size                                     |
-| Fee policy        | Pool uses a merchant-configured, bounded fee policy; any dynamic fee override must follow v4's fee rules |
-| Swap event        | `afterSwap` emits pool ID and swap delta/context for the audit indexer                                   |
-| Access control    | Only the configured treasury owner/role can update pause state and limits                                |
-
-Potential P1 enhancements:
-
-- A volatility-aware fee band using a trustworthy onchain reference.
-- Pool allowlisting and per-token exposure caps.
-- Position range alerts and rebalancing recommendations.
-
-Do not implement a fee discount by trusting an arbitrary wallet address supplied in `hookData`. Hook data is user-supplied context, not proof of identity. If a privileged fee class is needed, require a cryptographically verifiable authorization or onchain allowlist.
-
 ### Hook implementation requirements
 
-- Build from the official Uniswap v4 template and matching `v4-core` / `v4-periphery` versions.
 - Select the exact hook permissions required.
 - Mine a valid hook deployment address using `HookMiner`; v4 hook permissions are encoded in the low bits of the hook address.
 - Deploy the hook to the selected network and verify its source.
@@ -1044,61 +912,16 @@ Do not implement a fee discount by trusting an arbitrary wallet address supplied
 
 ### Cross-chain boundary
 
-Whitechain Sepolia (`1874`) and Unichain Sepolia (`1301`) are different chains. A v4 hook deployed on Unichain cannot read a Whitechain contract's state synchronously and cannot pull Whitechain USDT into its pool.
 
 Therefore:
 
-- The MVP's Uniswap treasury position is funded with tokens on the Uniswap deployment network.
 - Whitechain payment and refund balances remain on Whitechain.
 - A future bridge or cross-chain messaging layer may move approved treasury allocations, but it must include finality, message verification, failure handling and bridge-risk controls.
-- Do not advertise the draft's automatic 80/20 Whitechain-to-Uniswap sweep as implemented.
-
-### Uniswap acceptance checklist
-
-- [ ] "Pay With Any Token" checkout demonstration routing swap through Uniswap to settle invoice in exact USDT.
-- [ ] Public repository includes the hook source and relevant tests.
-- [ ] Hook permissions and address-mining script are documented.
-- [ ] Hook is deployed to a network with an official v4 PoolManager.
-- [ ] A v4 pool is initialized with the hook.
-- [ ] At least one real v4 swap is executed.
-- [ ] A configured hook rule is shown working (success and rejection path).
-- [ ] Preferably add/remove a real liquidity position.
-- [ ] README points directly to hook source, deployment and relevant lines of code.
-- [ ] `FEEDBACK.md` is committed.
-- [ ] Uniswap Developer Feedback Form is completed and includes the `FEEDBACK.md` link.
-
----
 
 ## 10. Unified Architecture
 
 ### 10.1 High-level architecture
 
-```mermaid
-flowchart TD
-    CUSTOMER[Human Customer] --> CHECKOUT[PulsePay React Checkout]
-    MERCHANT[Merchant / SaaS App] --> SDK[PulsePay SDK]
-    AGENT[Autonomous Buyer Agent] --> DIRECTORY[Service Directory]
-    DIRECTORY --> MANIFEST[x402 Service Manifest]
-    AGENT --> GATEWAY[x402 Client / Payment Gateway]
-
-    CHECKOUT --> API[PulsePay API]
-    SDK --> API
-    API --> WHITECHAIN[Whitechain MerchantHub]
-    GATEWAY --> FACILITATOR[Hedera x402 Facilitator]
-    FACILITATOR --> HEDERA[Hedera Network]
-    API --> HCS[Hedera HCS Audit Topic]
-
-    API --> TREASURY[PulsePay Treasury Adapter]
-    TREASURY --> UNISWAP[Uniswap v4 PoolManager + TreasuryGuardHook]
-
-    WHITECHAIN --> INDEXER[Chain Event Indexer]
-    HEDERA --> INDEXER
-    UNISWAP --> INDEXER
-    HCS --> INDEXER
-    INDEXER --> DB[(PostgreSQL)]
-    DB --> DASHBOARD[Merchant Dashboard / Receipt Portal]
-    DB --> WEBHOOKS[Merchant Webhooks]
-```
 
 ### 10.2 Main components
 
@@ -1112,8 +935,6 @@ flowchart TD
 | Hedera x402 server        | Protects merchant endpoints and delegates verification/settlement              | Hedera-supported x402 packages/facilitator         |
 | Buyer agent               | Discovers services, evaluates quote and signs payments within policy           | TypeScript worker                                  |
 | Hedera audit adapter      | Writes and queries HCS evidence                                                | `@hashgraph/sdk` and Mirror Node                   |
-| Uniswap adapter           | Quotes/swaps and v4 liquidity management                                       | Uniswap API/SDK, Universal Router, PositionManager |
-| TreasuryGuardHook         | Pool-specific merchant policy enforcement                                      | Solidity + Uniswap v4                              |
 | Event indexer             | Normalizes chain events and facilitator settlement results                     | viem, Hedera Mirror Node REST                      |
 | Database                  | Merchant state, offchain metadata, retries and normalized activity             | PostgreSQL + Drizzle ORM                           |
 | Webhook worker            | Signs, retries and records merchant event delivery                             | Node worker + Postgres outbox                      |
@@ -1188,7 +1009,6 @@ The API surface below is a target contract. It can be simplified during the hack
 | `GET`  | `/.well-known/x402.json`               | Publish merchant x402 service metadata |
 | `POST` | `/v1/agent/spend-policy`               | Update agent spend policy              |
 | `GET`  | `/v1/agent/spends`                     | Read agent spend history               |
-| `POST` | `/v1/treasury/quote`                   | Get Uniswap quote                      |
 | `POST` | `/v1/treasury/swap`                    | Build/execute treasury swap            |
 | `POST` | `/v1/treasury/liquidity`               | Add/remove v4 liquidity                |
 | `POST` | `/v1/webhooks/replay/:deliveryId`      | Replay failed webhook                  |
@@ -1246,18 +1066,6 @@ Every webhook must include an event ID and timestamp, be signed with a merchant-
 - Use Mirror Node queries to independently confirm entries.
 - Make the dashboard distinguish an HCS write failure from a token transfer success.
 - If the chain payment succeeds but HCS write fails, mark the audit record as pending/retryable; never claim that the payment failed or silently drop the log.
-
-### 13.4 Uniswap treasury security
-
-- Confirm network and official deployment addresses before transaction construction.
-- Use `amountOutMinimum`, deadline/expiry and slippage limits.
-- Apply max swap input and pause controls in the hook.
-- Only authorized treasury owners can update policy.
-- Hook address permissions must match implemented callbacks.
-- Mine a correct hook address with the v4 HookMiner process.
-- Test both permitted and rejected swap paths.
-- Make impermanent-loss and liquidity risks visible.
-- Never auto-deploy a merchant's entire balance into a pool.
 
 ### 13.5 Backend and web security
 
@@ -1332,45 +1140,6 @@ Never present “Paid” simply because a transaction was submitted.
 
 Use `pnpm` workspaces with Turborepo or a similarly simple monorepo setup. Keep the repository buildable throughout the event.
 
-```text
-pulsepay/
-├── apps/
-│   ├── dashboard/                 # Next.js merchant dashboard
-│   ├── demo-store/                # Separate sample SaaS app using the React SDK
-│   ├── api/                       # PulsePay HTTP API and x402 resource server
-│   └── agent-worker/              # Autonomous buyer/procurement agent
-│
-├── packages/
-│   ├── sdk-core/                  # Shared types, config, errors and client
-│   ├── sdk-react/                 # Checkout, receipts and merchant UI components
-│   ├── sdk-server/                # Server middleware, webhooks and service gateway
-│   ├── adapter-whitechain/        # Whitechain viem client and event reader
-│   ├── adapter-hedera/            # Hedera x402, HTS and HCS integration
-│   ├── adapter-uniswap/           # Uniswap API, v4 routing and position adapter
-│   ├── db/                        # Drizzle schema and migrations
-│   └── shared/                    # Schemas, validators and formatting
-│
-├── contracts/
-│   ├── whitechain/
-│   │   ├── src/PulsePayMerchantHub.sol
-│   │   ├── script/Deploy.s.sol
-│   │   └── test/
-│   └── uniswap-v4/
-│       ├── src/TreasuryGuardHook.sol
-│       ├── script/DeployHook.s.sol
-│       └── test/
-│
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── TRACK_ALIGNMENT.md
-│   └── DEMO_SCRIPT.md
-│
-├── WHITECHAIN_FEEDBACK.md
-├── FEEDBACK.md
-├── README.md
-├── pnpm-workspace.yaml
-└── turbo.json
-```
 
 ### 15.2 Recommended stack
 
@@ -1384,7 +1153,6 @@ pulsepay/
 | Whitechain contracts | Solidity + Foundry                            | Deployment, tests, verification and fuzzing         |
 | Hedera               | `@hashgraph/hedera-agent-kit` (^4.0.0) + `@hiero-ledger/sdk` (^2.81.0) + `@hashgraph/hedera-agent-kit-langchain` (^1.0.0) | HCS, native HBAR transfers, BaseTool plugins, policies and hooks |
 | x402                 | `@x402/core` + `@x402/hedera` (ExactHederaScheme) | Standardized Hedera x402 HTTP challenge & settlement |
-| Uniswap              | Uniswap API/SDK + v4 core/periphery           | Quotes, swaps, positions and hook integration       |
 | Database             | PostgreSQL + Drizzle ORM                      | Normalized events and merchant operations           |
 | Background jobs      | Node worker + Postgres job/outbox tables      | Renewal processing, webhooks and indexing           |
 | Validation           | Zod                                           | Runtime validation for configs, APIs and manifests  |
@@ -1397,36 +1165,6 @@ Avoid adding Kubernetes, multiple databases or a complex message broker for the 
 
 Keep secrets in local `.env` files and deployment secret stores. Commit `.env.example` with placeholders only.
 
-```env
-DATABASE_URL=
-PULSEPAY_APP_URL=
-PULSEPAY_API_SECRET=
-
-WHITECHAIN_CHAIN_ID=1874
-WHITECHAIN_RPC_URL=https://rpc.testnet.whitechain.io
-WHITECHAIN_EXPLORER_URL=https://explorer.testnet.whitechain.io
-WHITECHAIN_USDT_ADDRESS=0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7
-WHITECHAIN_MERCHANT_HUB=
-
-HEDERA_NETWORK=testnet
-HEDERA_NETWORK_X402=hedera:testnet
-HEDERA_OPERATOR_ID=
-HEDERA_OPERATOR_KEY=
-HEDERA_MERCHANT_ACCOUNT_ID=
-HEDERA_BUYER_ACCOUNT_ID=
-HEDERA_BUYER_KEY=
-HEDERA_AUDIT_TOPIC_ID=
-HEDERA_X402_FACILITATOR_URL=http://localhost:4020
-FACILITATOR_ACCOUNT_ID=
-FACILITATOR_PRIVATE_KEY=
-
-UNISWAP_CHAIN_ID=1301
-UNISWAP_RPC_URL=
-UNISWAP_POOL_MANAGER=
-UNISWAP_POSITION_MANAGER=
-UNISWAP_UNIVERSAL_ROUTER=
-UNISWAP_TREASURY_HOOK=
-```
 
 ---
 
@@ -1523,26 +1261,8 @@ The order below is intentional. Do not build the full dashboard before proving t
 
 **Exit condition:** The dashboard displays settled agent payments with independently verifiable HCS consensus evidence and working native refunds. Cleanly satisfies 100% native Hedera operation for the "No Solidity Allowed" bonus track.
 
-### Phase 8 — Build the Uniswap v4 integration
-
-50. Select the test network after checking the official Uniswap v4 deployment list; use Unichain Sepolia if convenient.
-51. Configure its official PoolManager and PositionManager addresses.
-52. Start from the matching Uniswap v4 Foundry template/version.
-53. Implement `TreasuryGuardHook.sol` with pause, maximum swap size and swap event.
-54. Write tests for allowed and rejected swaps.
-55. Mine a valid hook address for the selected hook permissions.
-56. Deploy and verify the hook.
-57. Create/initialize a v4 pool with the hook attached.
-58. Execute a real swap that invokes the hook.
-59. Demonstrate one rejected swap because of a policy limit or pause.
-60. Add the transaction and event to the PulsePay activity ledger.
-61. If time remains, add/remove liquidity using the PositionManager.
-
-**Exit condition:** Real Uniswap v4 pool + deployed hook + a passing and blocked transaction are demonstrable.
-
 ### Phase 9 — Unified ledger, CSV and polish
 
-62. Normalize Whitechain, Hedera and Uniswap transactions into one activity table.
 63. Add chain/network, token, amount, status, timestamp and transaction links.
 64. Add HCS topic/message references.
 65. Add CSV export with correct base-unit formatting.
@@ -1558,9 +1278,7 @@ The order below is intentional. Do not build the full dashboard before proving t
 70. Verify Whitechain contract on the explorer.
 71. Confirm a real required USDT payment and add its explorer link.
 72. Confirm a real Hedera x402 payment and add the HashScan link.
-73. Confirm Uniswap hook and pool addresses and point README directly to source files/lines.
 74. Complete `WHITECHAIN_FEEDBACK.md`.
-75. Complete `FEEDBACK.md` and submit the Uniswap Developer Feedback Form with its link.
 76. Update README with setup, architecture, limitations, transaction evidence and demo video.
 77. Record one 2–4 minute video that shows the Whitechain customer and merchant views and the wider agent/treasury story. Keep it under five minutes for Hedera.
 78. Tag a release commit and freeze the demo environment.
@@ -1606,18 +1324,6 @@ The order below is intentional. Do not build the full dashboard before proving t
 - HCS audit message includes the correct settlement transaction ID.
 - Failed HCS write is retried and is visible as an audit-pending state.
 
-### 17.3 Uniswap v4 tests
-
-- Hook permissions match the deployed hook address.
-- Pool is initialized with the intended hook address.
-- Swap under max size succeeds.
-- Swap above max size reverts.
-- Paused pool rejects swap.
-- Only authorized owner can update hook policy.
-- `afterSwap` event is emitted for a successful swap.
-- Router enforces `amountOutMinimum` / slippage bounds.
-- Liquidity addition/removal uses the correct PositionManager and pool.
-
 ### 17.4 End-to-end smoke tests
 
 - Customer can pay a Whitechain invoice and receive a receipt.
@@ -1625,7 +1331,6 @@ The order below is intentional. Do not build the full dashboard before proving t
 - Customer can cancel a subscription and the next renewal does not execute.
 - Agent can discover a Hedera service and pay one x402 request with no human approval.
 - Merchant can verify agent spend in HCS.
-- Merchant can execute a Uniswap v4 swap and see the event in the activity feed.
 - CSV export includes all three chain types without confusing token units.
 
 ---
@@ -1642,7 +1347,6 @@ Aim for **3 minutes 45 seconds**. This keeps the main video inside Whitechain's 
 | 1:50–2:20 | Subscription view                | Show active plan, next charge and cancel-anytime control                                                             | Whitechain |
 | 2:20–3:10 | Agent API / terminal + dashboard | Agent discovers service, gets 402, evaluates budget policy, signs and settles x402 payment in native HBAR (tinybars), receives response; open HashScan link | Hedera     |
 | 3:10–3:30 | HCS audit                        | Show the agent-spend audit entry and transaction reference                                                           | Hedera     |
-| 3:30–3:45 | Treasury                         | Show real Uniswap v4 swap, hook policy event and the transaction link                                                | Uniswap    |
 
 ### Demo recording rules
 
@@ -1685,17 +1389,6 @@ Aim for **3 minutes 45 seconds**. This keeps the main video inside Whitechain's 
   - [ ] Native HBAR (`asset: "0.0.0"`) and HTS token support.
   - [ ] 100% Native Hedera services (HTS + HCS, Zero Solidity on Hedera), qualifying for the "No Solidity Allowed" track.
 
-### 19.3 Uniswap Foundation submission
-
-- [ ] Public open-source repository.
-- [ ] README points directly to relevant Uniswap contracts and source lines.
-- [ ] Actual Uniswap stack integration is used in the product.
-- [ ] v4 hook source, tests, deployment and pool configuration are easy to find.
-- [ ] Real swap or liquidity interaction is demonstrated.
-- [ ] `FEEDBACK.md` is present in the repo.
-- [ ] Uniswap Developer Feedback Form is completed.
-- [ ] Feedback form contains the link to `FEEDBACK.md`.
-
 ### 19.4 Optional Hedera “No Solidity Allowed” bonus
 
 - [ ] Hedera module contains no Solidity contracts.
@@ -1720,7 +1413,6 @@ Aim for **3 minutes 45 seconds**. This keeps the main video inside Whitechain's 
 | HCS write fails after payment                  | Payment and audit status may diverge                                             | Durable retry/outbox; show payment settled but audit pending                                          |
 | v4 hook deployed to invalid address            | Hook callbacks may not execute or deployment may fail                            | Use HookMiner and assert permission bits before deployment                                            |
 | Arbitrary `hookData` is mistaken for identity  | A caller could spoof a privileged fee class                                      | Do not trust raw hookData; use a verifiable signature or onchain allowlist                            |
-| Cross-chain assumptions break refund flow      | Whitechain contract cannot synchronously pull Uniswap liquidity on another chain | Keep treasury assets separate in MVP; do not claim atomic cross-chain sweep                           |
 | Too many features delay proof of core tracks   | Three incomplete integrations score worse than three working proofs              | Build in the stated order; freeze P1/P2 scope until all three P0 demos work                           |
 
 ---
@@ -1739,11 +1431,9 @@ Aim for **3 minutes 45 seconds**. This keeps the main video inside Whitechain's 
 | Agent autonomy                   | No human approval during the normal below-budget payment                            |
 | Agent spend control              | One over-budget or disallowed request is blocked                                    |
 | HCS evidence                     | At least 1 confirmed agent-spend audit event                                        |
-| Uniswap v4                       | At least 1 real swap through a pool with the deployed custom hook                   |
 | Hook policy                      | At least 1 allowed and 1 rejected path                                              |
 | SDK integration                  | Separate demo app uses the checkout with approximately 20 lines of integration code |
 | Repo                             | Public, understandable and continuously updated                                     |
-| Feedback                         | Whitechain and Uniswap feedback files completed                                     |
 
 ### Product metrics after the hackathon
 
@@ -1769,9 +1459,6 @@ These decisions prevent the project from drifting during implementation.
 5. **Whitechain token:** The exact official track USDT address; no self-minted substitute.
 6. **Hedera role:** x402 paid service discovery, autonomous buyer agent, budgets and HCS audit.
 7. **Hedera payment:** Use a current supported Hedera x402 facilitator and standard protocol implementation.
-8. **Uniswap role:** Separate business treasury module using Uniswap v4 on a network with official v4 deployments.
-9. **Hook:** `TreasuryGuardHook` enforces actual business rules; it is not a decorative or unused contract.
-10. **Cross-chain strategy:** No bridge or automatic Whitechain-to-Uniswap sweep in MVP.
 11. **Subscription strategy:** Whitechain contract enforces subscription terms; an offchain keeper submits due renewals.
 12. **Scheduled Transactions:** Do not describe them as native recurring cron payments.
 13. **Refund strategy:** Refunds are new transfers with original-payment references and verifiable events.
@@ -1788,7 +1475,6 @@ PulsePay maps those needs to the network best suited for each part of the workfl
 
 - **Whitechain handles money coming from customers:** invoices, recurring stablecoin billing and refunds.
 - **Hedera handles money moving between software agents and paid services:** machine-readable quotes, autonomous payments, spend controls and audit evidence.
-- **Uniswap handles treasury actions:** token swaps and liquidity management under business-defined onchain controls.
 
 The shared SDK, normalized ledger and merchant dashboard make the product coherent. Each chain integration still has its own adapter, transaction format, finality rules and evidence.
 
@@ -1804,7 +1490,6 @@ This is the product's differentiator: **not just accepting crypto, but giving a 
 - [Whitechain — Operate · Stablecoin Payments for Business](https://ethglobal.com/events/mumbai/prizes)
 - [Hedera — AI Agents That Pay: x402 on Hedera](https://ethglobal.com/events/mumbai/prizes)
 - [Hedera — “No Solidity Allowed” bonus](https://ethglobal.com/events/mumbai/prizes)
-- [Uniswap Foundation — Build with Uniswap](https://ethglobal.com/events/mumbai/prizes)
 
 ### Whitechain
 
@@ -1829,20 +1514,6 @@ This is the product's differentiator: **not just accepting crypto, but giving a 
 - [Hedera Scheduled Transactions](https://docs.hedera.com/hedera/core-concepts/scheduled-transaction)
 - [HCS-14 Universal Agent ID specification](https://github.com/hiero-ledger/hiero-consensus-specifications/tree/main/docs/standards/hcs-14)
 
-### Uniswap
-
-- [Uniswap developer documentation](https://developers.uniswap.org/docs)
-- [Uniswap v4 overview](https://developers.uniswap.org/docs/protocols/v4)
-- [Uniswap v4 deployments](https://developers.uniswap.org/docs/protocols/v4/deployments)
-- [Uniswap v4 hook concepts](https://developers.uniswap.org/docs/protocols/v4/concepts/hooks)
-- [Uniswap v4 hook deployment](https://developers.uniswap.org/docs/protocols/v4/guides/hooks/hook-deployment)
-- [Uniswap v4 swap hooks](https://developers.uniswap.org/docs/protocols/v4/guides/hooks/swap-hooks)
-- [Uniswap v4 getting started](https://developers.uniswap.org/docs/protocols/v4/guides/getting-started)
-- [Uniswap Developer Feedback Form](https://developers.uniswap.org/hackathon-feedback)
-- [Uniswap v4 Foundry template](https://github.com/uniswapfoundation/v4-template)
-
----
-
 ## 25. Final Build Recommendation
 
 Build **PulsePay as a narrow, verifiable business-finance SDK**, not as an everything-platform.
@@ -1851,6 +1522,5 @@ The strongest hackathon version is:
 
 1. **Whitechain:** A working merchant checkout with official USDT, one partial refund and a customer-verifiable receipt. Add subscription signup/cancel and a renewal if time allows.
 2. **Hedera:** A real x402-protected endpoint plus a buyer agent that discovers it, pays autonomously within a budget and writes an HCS audit entry.
-3. **Uniswap:** A real v4 pool with a deployed `TreasuryGuardHook`, a successful swap and a policy-rejected swap. Add liquidity management if the core flow is already stable.
 
 Do not spend the first half of the hackathon building a huge dashboard, multi-chain abstraction framework or cross-chain treasury bridge. First secure the three onchain proofs. Then make the SDK integration clean, the merchant/customer experience polished and the demo easy for a judge to verify.

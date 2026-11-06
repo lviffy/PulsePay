@@ -1,34 +1,30 @@
 import { WhitechainAdapter, WhitechainClientConfig } from "@pulsepay/adapter-whitechain";
 import {
-  UniswapRoutingAdapter,
-  UniswapV4TreasuryAdapter,
-  UniswapRoutingConfig,
-  UniswapV4TreasuryConfig,
-} from "@pulsepay/adapter-uniswap";
-import {
-  SwapQuote,
+  CCIPBridgeAdapter,
+  CCIPMessageMonitor,
+  CCIPBridgeConfig,
+  QuoteBridgeParams,
+  BuildBridgeParams,
+} from "@pulsepay/adapter-ccip";
+import type {
+  BridgeQuote,
+  BridgeTransactionPayload,
 } from "@pulsepay/shared";
 
 export interface PulsePayConfig {
   merchantId?: string;
   whitechain: WhitechainClientConfig;
-  uniswap?: {
-    routing?: UniswapRoutingConfig;
-    treasury?: UniswapV4TreasuryConfig;
-  };
+  ccip?: CCIPBridgeConfig;
 }
 
 export class PulsePayClient {
   public readonly whitechain: WhitechainAdapter;
-  public readonly routing: UniswapRoutingAdapter;
-  public readonly treasury?: UniswapV4TreasuryAdapter;
+  public readonly bridge: CCIPBridgeAdapter;
+  public readonly bridgeMonitor = new CCIPMessageMonitor();
 
   constructor(config: PulsePayConfig) {
     this.whitechain = new WhitechainAdapter(config.whitechain);
-    this.routing = new UniswapRoutingAdapter(config.uniswap?.routing);
-    if (config.uniswap?.treasury) {
-      this.treasury = new UniswapV4TreasuryAdapter(config.uniswap.treasury);
-    }
+    this.bridge = new CCIPBridgeAdapter(config.ccip);
   }
 
   // --- Invoices ---
@@ -75,19 +71,19 @@ export class PulsePayClient {
     };
   }
 
-  // --- Universal Checkout ("Pay With Any Token") ---
-  get checkout() {
+  // --- Chainlink CCIP 2.0 Token Bridging ---
+  get bridgeOps() {
     return {
-      quotePayWithToken: (params: {
-        tokenInAddress: string;
-        tokenInSymbol: string;
-        tokenInDecimals: number;
-        tokenOutAddress: string;
-        targetUsdtAmountUnits: bigint;
-        slippageTolerancePercent?: number;
-        payerAddress: string;
-      }): Promise<SwapQuote> => {
-        return this.routing.getExactOutputQuote(params);
+      getStatus: this.bridgeMonitor.getStatus.bind(this.bridgeMonitor),
+      waitForDelivery: this.bridgeMonitor.waitForDelivery.bind(this.bridgeMonitor),
+      quoteFee: (params: QuoteBridgeParams): Promise<BridgeQuote> => {
+        return this.bridge.quoteBridgeFee(params);
+      },
+      buildTransactions: (params: BuildBridgeParams): Promise<BridgeTransactionPayload> => {
+        return this.bridge.buildBridgeTransactions(params);
+      },
+      getExplorerUrl: (messageId: string): string => {
+        return this.bridge.getExplorerUrl(messageId);
       },
     };
   }
@@ -99,4 +95,4 @@ export function createPulsePay(config: PulsePayConfig): PulsePayClient {
 
 export * from "@pulsepay/shared";
 export * from "@pulsepay/adapter-whitechain";
-export * from "@pulsepay/adapter-uniswap";
+export * from "@pulsepay/adapter-ccip";

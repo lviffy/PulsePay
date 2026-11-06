@@ -211,12 +211,12 @@ importers:
 
   apps/demo-store:
     dependencies:
+      '@pulsepay/adapter-ccip':
+        specifier: workspace:*
+        version: link:../../packages/adapter-ccip
       '@pulsepay/adapter-hedera':
         specifier: workspace:*
         version: link:../../packages/adapter-hedera
-      '@pulsepay/adapter-uniswap':
-        specifier: workspace:*
-        version: link:../../packages/adapter-uniswap
       '@pulsepay/sdk-core':
         specifier: workspace:*
         version: link:../../packages/sdk-core
@@ -239,12 +239,12 @@ importers:
 
   apps/sdk-demo:
     dependencies:
+      '@pulsepay/adapter-ccip':
+        specifier: workspace:*
+        version: link:../../packages/adapter-ccip
       '@pulsepay/adapter-hedera':
         specifier: workspace:*
         version: link:../../packages/adapter-hedera
-      '@pulsepay/adapter-uniswap':
-        specifier: workspace:*
-        version: link:../../packages/adapter-uniswap
       '@pulsepay/adapter-whitechain':
         specifier: workspace:*
         version: link:../../packages/adapter-whitechain
@@ -276,9 +276,9 @@ importers:
       '@fontsource/jetbrains-mono':
         specifier: ^5.2.8
         version: 5.3.0
-      '@pulsepay/adapter-uniswap':
+      '@pulsepay/adapter-ccip':
         specifier: workspace:*
-        version: link:../../packages/adapter-uniswap
+        version: link:../../packages/adapter-ccip
       '@pulsepay/adapter-whitechain':
         specifier: workspace:*
         version: link:../../packages/adapter-whitechain
@@ -341,6 +341,19 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/adapter-ccip:
+    dependencies:
+      '@pulsepay/shared':
+        specifier: workspace:*
+        version: link:../shared
+      viem:
+        specifier: ^2.23.0
+        version: 2.57.16(typescript@5.9.3)(zod@4.6.7)
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/adapter-hedera:
     dependencies:
       '@hashgraph/hedera-agent-kit':
@@ -366,19 +379,6 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
-  packages/adapter-uniswap:
-    dependencies:
-      '@pulsepay/shared':
-        specifier: workspace:*
-        version: link:../shared
-      viem:
-        specifier: ^2.23.0
-        version: 2.57.16(typescript@5.9.3)(zod@4.6.7)
-    devDependencies:
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
   packages/adapter-whitechain:
     dependencies:
       '@pulsepay/shared':
@@ -394,9 +394,9 @@ importers:
 
   packages/sdk-core:
     dependencies:
-      '@pulsepay/adapter-uniswap':
+      '@pulsepay/adapter-ccip':
         specifier: workspace:*
-        version: link:../adapter-uniswap
+        version: link:../adapter-ccip
       '@pulsepay/adapter-whitechain':
         specifier: workspace:*
         version: link:../adapter-whitechain

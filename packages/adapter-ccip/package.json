@@ -1,0 +1,38 @@
+{
+  "name": "@pulsepay/adapter-ccip",
+  "version": "1.0.0",
+  "description": "Chainlink CCIP 2.0 token bridging adapter for PulsePay",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lviffy/ETHGLOBAL.git",
+    "directory": "packages/adapter-ccip"
+  },
+  "bugs": {
+    "url": "https://github.com/lviffy/ETHGLOBAL/issues"
+  },
+  "homepage": "https://github.com/lviffy/ETHGLOBAL#readme",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@pulsepay/shared": "workspace:*",
+    "viem": "^2.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

@@ -8,23 +8,21 @@ This page follows the implementation in `contracts/whitechain/src/PulsePayMercha
 
 ```bash
 pnpm contracts:whitechain:test
-pnpm contracts:uniswap:test
 ```
 
 Node 22.13 or newer · pnpm 12.14.0. Configure only the networks you will use.
 
 ## 03 / Walkthrough
 
-Whitechain Sepolia uses chain 1874 and RPC https://rpc.testnet.whitechain.io. The SDK’s USDT address is 0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7. Unichain Sepolia uses chain 1301 and pool manager 0x00B036bf97F650eEa2f656606A6C4F07449c25f5. Configure your own merchant hub and treasury hook.
+Whitechain Sepolia uses chain 1874 and RPC https://rpc.testnet.whitechain.io. The SDK’s USDT address is 0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7. Chainlink CCIP 2.0 token bridging uses official CCIP Routers on Ethereum Sepolia and Hedera Testnet.
 
-Hedera integration is TypeScript and native HBAR; no Hedera Solidity contract is required. Treat the chain constants as testnet configuration and verify your deployment before sending transactions.
+Hedera integration is TypeScript and native HBAR; no custom Hedera Solidity contract is required. Treat the chain constants as testnet configuration and verify your deployment before sending transactions.
 
 ## 04 / Anatomy
 
 | Class or file | Responsibility |
 | --- | --- |
 | `PulsePayMerchantHub` | Whitechain invoice, refund and subscription ledger |
-| `TreasuryGuardHook` | Unichain v4 input-currency policy |
 
 Source: [contracts/whitechain/src/PulsePayMerchantHub.sol](https://github.com/lviffy/ETHGLOBAL/blob/main/contracts/whitechain/src/PulsePayMerchantHub.sol).
 

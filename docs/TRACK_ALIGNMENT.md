@@ -4,7 +4,6 @@ This document maps PulsePay's architectural features, deliverables, and demo flo
 
 1. **Hedera** — *AI Agents That Pay: x402 on Hedera* ($6,500) + Optional *No Solidity Allowed* ($2,000)
 2. **Whitechain** — *Operate · Stablecoin Payments for Business* ($5,000)
-3. **Uniswap Foundation** — *Build with Uniswap* ($10,000)
 
 **Total Target Prize Pool:** **$21,500 – $23,500**
 
@@ -17,7 +16,6 @@ This document maps PulsePay's architectural features, deliverables, and demo flo
 | **Hedera** | $6,500 (1st: $3,000, 2nd: $2,000, 3rd: $1,500) | • At least one x402-protected endpoint<br>• Settles on Hedera testnet/mainnet via facilitator<br>• Autonomous agent completes payment end-to-end with no human approval<br>• Public repo + README with real Hedera tx ID<br>• Demo video $\le$ 5 min with HashScan links | • Protected route `POST /v1/services/:id/query`<br>• `@x402/core` + `@x402/hedera/exact/server` (`ExactHederaScheme`)<br>• Autonomous buyer agent using `@hashgraph/hedera-agent-kit` (v4) + `x402_pay_tool`<br>• Settle in native HBAR (`asset: "0.0.0"`) & tinybars (`100_000_000n`)<br>• Real testnet tx ID and HashScan URL captured | PRD §7.5, §8.4, §9.2, §16 (Phases 5-7), §19.2 |
 | **Hedera (Extra Points)** | Top scoring boost | • Spending controls: budgets, per-merchant caps, allowlists, human-in-the-loop threshold<br>• HCS topic tamper-evident audit log<br>• Hedera Agent Kit usage<br>• Multi-agent comparison / research agent<br>• Native HTS / HBAR refunds<br>• *No Solidity Allowed* ($2,000) | • `PulsePaySpendLimitPolicy` extending `AbstractPolicy` (Stage 1 & 3 blocking)<br>• `PulsePayHcsAuditHook` extending `AbstractHook` emitting consensus audit logs to merchant topic<br>• Built with `@hashgraph/hedera-agent-kit` v4 + `BaseTool`<br>• Research agent compares services from registry before buying<br>• Native HBAR refund via `issue_refund_tool`<br>• Zero Solidity deployed on Hedera | PRD §9.2, §16, §19.2, §19.4 |
 | **Whitechain** | $5,000 (1st: $2,500, 2nd: $1,500, 3rd: $1,000) | • Whitechain Sepolia (Chain ID `1874`)<br>• Verified contract on Whitechain explorer<br>• Payment in official USDT (`0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7`)<br>• README explains why onchain stablecoin settlement is needed<br>• Drop-in widget/SDK added in ~20 lines<br>• Both views in demo: merchant & customer<br>• Post-first-payment flow: refund, subscription renewal, CSV export<br>• `WHITECHAIN_FEEDBACK.md`<br>• 2–4 min demo video | • `PulsePayMerchantHub.sol` deployed on Whitechain Sepolia (`1874`)<br>• Explicitly bound to official USDT contract<br>• Drop-in `<PulsePayCheckout />` in ~20 lines<br>• Dual UI views: Customer Checkout/Receipt & Merchant Console<br>• One-click reserve-backed partial/full refund onchain<br>• Permit/allowance subscription billing + background renewal worker<br>• Accountant CSV export with normalized multi-chain columns<br>• `WHITECHAIN_FEEDBACK.md` file in root | PRD §7.1–7.4, §8.3, §9.1, §16 (Phases 1-4), §19.1 |
-| **Uniswap Foundation** | $10,000 (1st: $4,000, 2nd: $3,000, 3rd: $2,000, 4th: $1,000) | • Public open-source GitHub repo<br>• `FEEDBACK.md` in repository<br>• Completed submission to Uniswap Developer Feedback Form with link to `FEEDBACK.md`<br>• README clearly pointing to contracts & lines of code<br>• Meaningful integration of Uniswap stack | • **Universal Checkout ("Pay With Any Token")**: Routes swaps via Uniswap AMM/Trading API so buyers paying with any token (e.g. WETH, USDC) settle the merchant's exact USDT invoice<br>• **PulsePay Treasury with Uniswap v4**: Custom `TreasuryGuardHook.sol` enforcing emergency pause, max single swap size, and emitting `afterSwap` events for business ledger<br>• `FEEDBACK.md` in root + feedback form submission with direct links to hook lines | PRD §6.1b, §6.7, §7.7, §9.3, §16 (Phase 8), §19.3 |
 
 ---
 
@@ -58,19 +56,6 @@ This document maps PulsePay's architectural features, deliverables, and demo flo
 
 ---
 
-### 2.3 Uniswap Foundation: "Build with Uniswap" ($10,000)
-
-#### Qualification Compliance:
-- [x] **Public Open-Source Repo:** Full code in public GitHub repository.
-- [x] **Clear Code Pointers:** README points directly to hook contracts, address mining script, tests, and deployment addresses.
-- [x] **`FEEDBACK.md` Deliverable:** Detailed developer feedback on Uniswap v4 tooling, HookMiner, and SDK integration included at repo root.
-- [x] **Form Submission:** Explicit step in release checklist to submit to `https://developers.uniswap.org/hackathon-feedback` referencing `FEEDBACK.md`.
-- [x] **Substantive Dual Integration:**
-  1. *Universal Checkout*: Enables customers holding any token to pay a Whitechain invoice via swap routing.
-  2. *Uniswap v4 Treasury Management*: Custom `TreasuryGuardHook.sol` deployed with mined permission bits enforcing emergency stop, maximum trade limits, and accounting event emission.
-
----
-
 ## 3. Demo Video Storyboard (3m 45s Total)
 
 | Timestamp | Target Track | Screen & Action | Key Message & Evidence |
@@ -81,5 +66,4 @@ This document maps PulsePay's architectural features, deliverables, and demo flo
 | **1:50 – 2:20** | **Whitechain** | Subscriptions & Renewals | Active plan with next charge date, cancel-anytime authorization, and accountant CSV export. |
 | **2:20 – 3:10** | **Hedera** | Agent Terminal + Resource API | Autonomous Buyer Agent receives 402 challenge, validates `PulsePaySpendLimitPolicy`, settles via x402 facilitator in native HBAR, and unboxes data with zero human clicks. Open HashScan. |
 | **3:10 – 3:30** | **Hedera** | HCS Consensus Audit Explorer | Show tamper-evident consensus topic with sequence number and settled transaction reference; highlight "No Solidity" native implementation. |
-| **3:30 – 3:45** | **Uniswap** | PulsePay Treasury (Uniswap v4) | Execute swap through v4 pool guarded by `TreasuryGuardHook.sol`; show hook policy enforcement and transaction link. |
 

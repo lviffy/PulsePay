@@ -45,10 +45,10 @@
 </script>
 
 <nav class="dock {merchant ? 'dock-merchant' : ''}" bind:this={dock} aria-label="Main navigation">
-	<div class="dock-marquee" aria-label="Whitechain, Uniswap v4, Hedera x402">
+	<div class="dock-marquee" aria-label="Whitechain, Chainlink CCIP 2.0, Hedera x402">
 		<span>
-			<i class="status-dot"></i> ONCHAIN BY DESIGN · WHITECHAIN · UNISWAP V4 · HEDERA X402 · ONCHAIN
-			BY DESIGN · WHITECHAIN · UNISWAP V4 · HEDERA X402 ·
+			<i class="status-dot"></i> ONCHAIN BY DESIGN · WHITECHAIN · CHAINLINK CCIP 2.0 · HEDERA X402 · ONCHAIN
+			BY DESIGN · WHITECHAIN · CHAINLINK CCIP 2.0 · HEDERA X402 ·
 		</span>
 	</div>
 	<div class="dock-main">

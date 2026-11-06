@@ -86,9 +86,9 @@ export const GET: RequestHandler = async () => {
 			},
 			'/api/treasury': {
 				get: {
-					summary: 'Real Uniswap v4 treasury guard policy',
+					summary: 'Chainlink CCIP 2.0 cross-chain token bridge status',
 					responses: {
-						200: { description: 'Owner, paused state, limit currency and raw input limit' },
+						200: { description: 'Source selector, destination selector, router address, gasLimit and explorer details' },
 						503: { description: 'Read or configuration failed' }
 					}
 				}

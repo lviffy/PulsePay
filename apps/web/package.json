@@ -13,7 +13,7 @@
   "dependencies": {
     "@fontsource-variable/space-grotesk": "^5.2.10",
     "@fontsource/jetbrains-mono": "^5.2.8",
-    "@pulsepay/adapter-uniswap": "workspace:*",
+    "@pulsepay/adapter-ccip": "workspace:*",
     "@pulsepay/adapter-whitechain": "workspace:*",
     "@pulsepay/sdk-core": "workspace:*",
     "@pulsepay/sdk-server": "workspace:*",

@@ -45,7 +45,6 @@ export async function getSourceFiles(): Promise<SourceFile[]> {
 		'PulsePay_ETHGlobal_Mumbai_PRD.md',
 		...(await walk('packages')),
 		...(await walk('contracts/whitechain/src')),
-		...(await walk('contracts/uniswap-v4/src')),
 		'apps/agent-worker/src/index.ts',
 		'skills/pulsepay/SKILL.md'
 	];

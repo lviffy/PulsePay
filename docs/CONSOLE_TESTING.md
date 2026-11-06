@@ -5,7 +5,6 @@ Completed through the actual web console on `http://localhost:3100`, using the c
 - Hub: `0xC81399e6344f9264830ecB6DF46a5e9458f4f2C3`.
 - Merchant and payer: `0x6105F7D9807998014ca12bF1D67849de7B1094Ac`; the same testnet account filled both roles.
 - Signing: a real EIP-1193 test-wallet bridge forwarded UI requests to a funded signer in the local test process. The private key was read from `.env` and was never injected into the browser. This verifies the app’s wallet-provider path, not the MetaMask extension’s own UI.
-- Every submitted write was constrained to the configured Whitechain hub or its USDT token. No mainnet or Unichain write was submitted.
 
 ## Actions exercised
 
@@ -26,14 +25,12 @@ Completed through the actual web console on `http://localhost:3100`, using the c
 | Cancel subscriptions | Cancelled both test subscriptions through the console and verified active=false onchain and CANCELLED in the table. |
 | Download CSV | Downloaded the console CSV; all six test settlement/refund events are present with matching transaction hashes and raw amounts. |
 | Hedera audit/discovery | Configured topic messages and actual paid-service discovery rendered. Authenticated API state returned verified activity; an unpaid protected request returned HTTP 402. |
-| Treasury policy | Actual hook policy rendered; an attempted policy update was rejected because the connected signer is not the hook owner. No Unichain transaction was broadcast. |
 | Phone layout | Invoices, subscriptions, agents, exports and settings rendered at 390×844 without page overflow. These phone checks did not repeat signed writes. |
 
 ## SDK setup and limits
 
 The console has no subscriber-enrollment screen. The SDK encoder was used to authorize subscriptions onchain. A second, real plan with a five-second interval was also created with the SDK, allowing a due renewal to be exercised immediately through the console instead of waiting a day. Those setup transactions are labelled separately below. Both subscriptions were cancelled after testing.
 
-The configured Unichain hook owner differs from the funded test signer, which also has no Unichain gas. Policy mutation was therefore not completed. No fresh HBAR transfer, HCS submission, distinct-customer wallet flow, or browser-extension approval interaction was tested in this run.
 
 ## Defect found and fixed
 

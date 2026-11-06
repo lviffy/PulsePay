@@ -31,7 +31,6 @@ The aim is not to create a large dashboard for the sake of having pages. Every s
 
 1. **Whitechain:** human-facing USDT checkout, invoices, subscriptions, renewals, refunds and verifiable receipts.
 2. **Hedera:** x402 service monetization, machine-readable service discovery, autonomous agent payments, spending policies and HCS audit records.
-3. **Uniswap v4:** a separate onchain treasury surface for supported swaps, liquidity operations and hook-enforced business policies.
 
 The UI must make the three integrations feel like one coherent business product while never implying that assets, state or transactions are shared atomically across chains.
 
@@ -69,7 +68,6 @@ The current repository is a compact, working demo application, not the expanded 
 | **1. Overview** | KPIs, revenue/reserve split, setup state and recent activity | Merchant overview panel
 | **2. Sales & Invoices** | Invoice list, create-invoice modal, payment records/details and refund modal | Invoice and payment operations
 | **3. Subscriptions** | Active subscriptions, renewal/keeper trigger, next renewal and cancellation state | Subscription operations
-| **4. Uniswap & Treasury** | v4 swap modal, LP position summary, circuit-breaker pause and maximum swap limit | `TreasuryGuardHook.sol` and Uniswap adapter
 | **5. AI Agent Commerce** | x402 endpoint, native HBAR price, per-request cap, daily budget and HCS topic configuration | Hedera adapter and agent worker
 | **6. Reserves & Payouts** | Refund reserve pool, available net proceeds and merchant withdrawal | Whitechain `reserveHeldUsdt` accounting
 | **7. Developer & Webhooks** | API keys, webhook simulator, CSV export and contract addresses | Developer operations and `/api/export.csv`
@@ -78,7 +76,6 @@ The currently implemented application surfaces are:
 
 - `apps/demo-store`: `/` (customer storefront and universal checkout), `/merchant` (seven-tab merchant console), `/receipt/:id` (customer-verifiable receipt), `/api/export.csv` (normalized accountant export) and `/.well-known/x402.json` (machine-readable service manifest).
 - `packages/sdk-react`: `<PulsePayCheckout />`, `<Receipt />` and `<MerchantBillingDashboard />` as the drop-in React integration surface.
-- `contracts/`: Whitechain `PulsePayMerchantHub.sol` and Uniswap v4 `TreasuryGuardHook.sol`; Hedera operations use the native `@hashgraph/sdk` adapter rather than Solidity contracts on Hedera.
 
 **Scope rule:** Section 2 (public marketing site) and Section 11 (full docs portal) are future-facing content blueprints, not current app routes. Sections 3–9 describe capabilities to compose inside the seven merchant tabs, drawers and modals. Section 10 describes customer journeys, with `/` and `/receipt/:id` as the current demo surfaces. Do not create a separate route for every conceptual page in this document. The expanded route architecture in Appendix B is explicitly a post-hackathon v2 roadmap, not a P0 requirement.
 
@@ -88,8 +85,6 @@ The currently implemented application surfaces are:
 - **Hedera:** the current agent payment denomination is **native HBAR**, represented as asset ID `0.0.0`; convert HBAR to tinybars using 100,000,000 tinybars per HBAR. Example display: `0.50 HBAR` = `50,000,000 tinybars`. Do not label this as HTS USDC or another HTS token.
 - **Hedera policies:** show the `PulsePaySpendLimitPolicy` limits in HBAR: daily budget and per-request cap. The budget is configured during agent setup (Stage 1) and evaluated again before a payment is signed (Stage 3).
 - **Hedera audit:** Stage 7 configures the HCS audit topic. `0.0.789123` is the example topic ID used in the demo configuration; treat it as environment configuration, not a universal hard-coded topic. Show the actual configured topic ID, HCS sequence/message reference and HashScan transaction verification link.
-- **Uniswap:** universal checkout routing and treasury operations are two visible uses of the Uniswap adapter. Keep the swap network, transaction and balances explicit. A quote is not settlement, and no UI should imply atomic cross-chain movement unless the implementation has a verified bridge/settlement leg.
-- **Uniswap checkout:** when the adapter returns a valid route, customers may choose direct Whitechain USDT or pay with supported WETH/USDC through the Uniswap Universal Router. The route must show the input quote, slippage/minimum output and exact USDT amount expected by the merchant. Only mark the invoice paid after the required Whitechain settlement is confirmed.
 
 ---
 
@@ -99,51 +94,6 @@ The currently implemented application surfaces are:
 
 The hackathon application is intentionally small. Use this sitemap as the source of truth for the current build:
 
-```text
-PulsePay (current ETHGlobal Mumbai MVP)
-│
-├── Customer storefront and universal checkout `/`
-│   ├── Storefront / invoice checkout
-│   ├── Pay with Whitechain USDT
-│   └── Pay with WETH / USDC through Uniswap Universal Router
-│
-├── Merchant operations console `/merchant`
-│   ├── 1. Overview
-│   ├── 2. Sales & Invoices
-│   │   ├── Invoice list / create invoice modal
-│   │   ├── Payment details
-│   │   └── Refund modal / refund history
-│   ├── 3. Subscriptions
-│   │   ├── Active subscriptions
-│   │   ├── Renewal / keeper action
-│   │   └── Cancellation state
-│   ├── 4. Uniswap & Treasury
-│   │   ├── v4 swap modal
-│   │   ├── LP position summary
-│   │   └── Hook circuit breaker / max swap limit
-│   ├── 5. AI Agent Commerce
-│   │   ├── x402 service endpoint / manifest
-│   │   ├── HBAR price and spend limits
-│   │   └── HCS audit topic and agent activity
-│   ├── 6. Reserves & Payouts
-│   │   ├── Refund reserve pool
-│   │   ├── Available net proceeds
-│   │   └── Withdraw proceeds
-│   └── 7. Developer & Webhooks
-│       ├── API keys / integration details
-│       ├── Webhook simulator
-│       ├── Accountant CSV export
-│       └── Contract addresses
-│
-├── Customer receipt `/receipt/:id`
-├── Accountant export `/api/export.csv`
-├── Agent discovery `/.well-known/x402.json`
-│
-└── React SDK (`packages/sdk-react`)
-    ├── <PulsePayCheckout />
-    ├── <Receipt />
-    └── <MerchantBillingDashboard />
-```
 
 ### Product architecture after the hackathon
 
@@ -155,22 +105,6 @@ The current `/merchant` console has a **seven-item persistent left sidebar**. Ke
 
 ### Sidebar structure
 
-```text
-┌────────────────────────────────────┐
-│  PULSEPAY                           │
-│  Merchant workspace       Testnet   │
-├────────────────────────────────────┤
-│  ◫  Overview                        │
-│  ▤  Sales & Invoices                 │
-│  ↻  Subscriptions                   │
-│  ⇄  Uniswap & Treasury              │
-│  ◈  AI Agent Commerce               │
-│  ◒  Reserves & Payouts              │
-│  </> Developer & Webhooks           │
-├────────────────────────────────────┤
-│  ?  Help / Docs          Profile ▾   │
-└────────────────────────────────────┘
-```
 
 ### What belongs in each tab
 
@@ -179,7 +113,6 @@ The current `/merchant` console has a **seven-item persistent left sidebar**. Ke
 | **Overview** | KPIs, revenue split, reserve status, setup checklist and recent activity | KPI drill-downs and activity detail drawer
 | **Sales & Invoices** | Invoice table, payment rows, create-invoice form, paid/pending states and refund actions | Create invoice modal, payment detail drawer, refund modal
 | **Subscriptions** | Active plans/subscribers, next renewal, keeper renewal action, failure state and cancellation | Plan editor, subscription detail drawer, cancellation confirmation
-| **Uniswap & Treasury** | Connected v4 network, swap, LP position, hook state, circuit-breaker pause and max swap limit | Swap modal, position detail drawer, policy confirmation
 | **AI Agent Commerce** | x402 endpoint/manifest, HBAR pricing, agent spend policy, recent requests and HCS audit status | Service configuration, policy editor, request/evidence drawer
 | **Reserves & Payouts** | Refund reserve pool, reserve ratio, available net proceeds, withdrawal history and payout action | Withdraw proceeds confirmation and payout detail drawer
 | **Developer & Webhooks** | SDK components, API keys, webhook simulator, contract addresses and CSV export | Reveal/rotate key confirmation, webhook test result, export action
@@ -198,7 +131,6 @@ The current `/merchant` console has a **seven-item persistent left sidebar**. Ke
 
 - Payments, invoices and refunds are grouped in **Sales & Invoices** for the MVP. Refunds are initiated from a payment/invoice context and may also appear in the table's refund filter.
 - Subscription plans, active subscriptions, renewal execution and cancellation live in **Subscriptions**.
-- Swap routing, LP position summary and hook controls live in **Uniswap & Treasury**.
 - Merchant services, buyer-agent spend policy, HBAR activity and HCS evidence live in **AI Agent Commerce**.
 - Reserve accounting and withdrawals get a first-class **Reserves & Payouts** tab; do not bury reserve state inside the refund modal.
 - API keys, webhook simulation, CSV export and deployed contract addresses live in **Developer & Webhooks**.
@@ -227,7 +159,6 @@ Every dashboard page uses the same top header pattern:
 
 | Route | Purpose |
 |---|---|
-| `/` | Customer storefront and universal checkout (direct Whitechain USDT or supported Uniswap-routed token) |
 | `/merchant` | Single merchant operations console with seven persistent tabs |
 | `/receipt/:id` | Customer-verifiable payment/refund receipt |
 | `/api/export.csv` | Normalized multi-chain accountant CSV export |
@@ -282,7 +213,6 @@ Explain what PulsePay does and get qualified merchants/developers to start integ
 **Primary CTA:** `Start building`  
 **Secondary CTA:** `Explore the SDK`
 
-Small supporting note: `Built for Whitechain, Hedera x402 and Uniswap v4 integrations.`
 
 **Hero visual:** Use a clean product screenshot or carefully composed dashboard preview. Show a compact summary with one human payment, one agent payment and one treasury event. Do not use floating coins, 3D chains, glowing orbs or generic AI robot illustrations.
 
@@ -312,7 +242,6 @@ Three horizontally aligned cards:
 |---|---|---|---|
 | Whitechain | Get paid by customers | USDT checkout, invoices, subscriptions, refunds and receipts | `Explore payments` |
 | Hedera | Let agents pay for services | x402 service discovery, autonomous payments, budgets and HCS audit | `Explore agent commerce` |
-| Uniswap | Operate treasury liquidity | v4 swaps, liquidity positions and hook-enforced treasury rules | `Explore treasury` |
 
 Use small network identifiers, but never imply that one chain's funds are automatically moved to another.
 
@@ -389,7 +318,6 @@ Give a more detailed product explanation than the homepage.
 2. Shared merchant workspace.
 3. Whitechain billing lifecycle.
 4. Hedera agent payment lifecycle.
-5. Uniswap treasury operations.
 6. Unified activity and audit evidence.
 7. SDK integration approach.
 8. CTA to docs.
@@ -417,7 +345,6 @@ Explain public service manifests, x402 402 responses, facilitator verification/s
 
 ### Treasury (`/product/treasury`)
 
-Explain supported Uniswap v4 treasury operations: quote, swap, liquidity position and hook policy. State the network boundary explicitly: treasury assets are on the configured Uniswap network; no automatic Whitechain-to-Uniswap sweep is part of the MVP.
 
 ## 2.5 Solutions pages (`/solutions/*`)
 
@@ -491,20 +418,6 @@ A new merchant should reach a useful dashboard quickly. Do not force every chain
 
 ### Entry flow
 
-```mermaid
-flowchart TD
-  A[Visit PulsePay] --> B[Get started]
-  B --> C[Connect wallet / sign in]
-  C --> D[Create workspace]
-  D --> E[Workspace overview]
-  E --> F[Setup checklist]
-  F --> G[Configure Whitechain]
-  F --> H[Publish an agent service]
-  F --> I[Configure Uniswap treasury]
-  G --> J[Create first invoice]
-  H --> K[Run x402 test]
-  I --> L[Connect treasury pool]
-```
 
 ### Onboarding steps
 
@@ -523,13 +436,11 @@ flowchart TD
 **Step 3 — Choose what to set up first**
 - `Accept customer payments` (recommended first action).
 - `Monetize an API with x402`.
-- `Manage a Uniswap treasury`.
 - User can skip and complete later.
 
 **Step 4 — Configure chosen module**
 - Whitechain: check network, official USDT address and deployed merchant contract.
 - Hedera: connect testnet account, configure facilitator and audit topic.
-- Uniswap: choose supported v4 network, verify PoolManager/Router/PositionManager addresses and configured pool/hook.
 
 **Step 5 — Verify setup**
 - Show individual checks with actionable failures.
@@ -553,7 +464,6 @@ Checklist items:
 - [ ] Configure Hedera account and HCS audit topic.
 - [ ] Publish first x402 service.
 - [ ] Complete a paid request with a buyer agent.
-- [ ] Configure Uniswap v4 network and hook.
 - [ ] Execute a test swap.
 
 The checklist should distinguish **required to use a module** from **optional advanced setup**.
@@ -564,7 +474,6 @@ The checklist should distinguish **required to use a module** from **optional ad
 
 ## 4.1 Dashboard shell
 
-The persistent sidebar is the seven-item structure in Section 1.2: Overview, Sales & Invoices, Subscriptions, Uniswap & Treasury, AI Agent Commerce, Reserves & Payouts, and Developer & Webhooks. Do not add standalone Payments, Refunds, Agent Activity, Audit Log or Settings navigation items to this MVP shell. Those are in-tab content panels or future product modules.
 
 **MVP implementation constraint:** this shell is mounted at `/merchant` and exposes exactly the seven tabs in Section 1.2. The later page sections describe the content and interactions that each tab composes; they do not create a second navigation model.
 
@@ -668,11 +577,9 @@ Three concise panels:
 - HCS audit topic status.
 - CTA: `Open AI Agent Commerce`.
 
-**Uniswap & Treasury**
 - Selected v4 network.
 - Pool/hook status and max swap limit.
 - Active positions count.
-- CTA: `Open Uniswap & Treasury`.
 
 **Reserves & Payouts**
 - Refund reserve held and configured reserve ratio.
@@ -733,7 +640,6 @@ Show actual payment records across supported payment rails in one consistent tab
 - Date range.
 - Status.
 - Payment type: invoice, subscription renewal, x402 service, other.
-- Network: Whitechain, Hedera, selected Uniswap network if relevant to treasury transaction records.
 - Asset/token.
 - Customer/payer search.
 - Amount range.
@@ -1537,198 +1443,6 @@ Use readable labels in the main view and raw codes in technical details.
 
 ---
 
-# 7. Treasury — Uniswap v4
-
-## 7.1 Treasury overview (`/app/treasury`)
-
-### Goal
-
-Manage assets and positions on the configured Uniswap v4 network. Keep the network boundary visible and do not present Whitechain payment funds as part of this treasury balance.
-
-### Header
-
-**Title:** Treasury  
-**Subtitle:** Manage swaps, liquidity positions and treasury policy on your selected Uniswap v4 network.  
-**Controls:** Network selector scoped to Treasury.  
-**Primary action:** `New swap`.
-
-### Network context banner
-
-Display:
-- Selected network and chain ID.
-- Environment (testnet).
-- Official PoolManager/config status.
-- Wallet address.
-- Hook deployed/attached status.
-
-Add a short note: `Treasury assets are held on this network. Whitechain customer payments remain on Whitechain unless a separate cross-chain flow is implemented.`
-
-### Balance summary
-
-- Wallet token balances.
-- Value estimate only when pricing is trustworthy; label as estimate.
-- LP positions count.
-- Available vs deployed amounts where derivable.
-
-### Main panels
-
-1. **Treasury allocation:** token balances and positions.
-2. **Liquidity positions:** pool, tokens, range, liquidity, fee data if available.
-3. **Policy health:** hook paused/active, max swap size, policy owner.
-4. **Recent treasury activity:** swaps and liquidity changes.
-
-### Empty state
-
-`No treasury positions yet` with explanation that a wallet and pool must be configured on a supported Uniswap v4 network. CTA: `Configure treasury` or `View supported networks`.
-
-## 7.2 Swap (`/app/treasury/swap`)
-
-### Goal
-
-Let an authorized merchant swap supported assets through an official Uniswap v4 route with explicit quote and risk information.
-
-### Page layout
-
-Top: network selector and wallet balance.
-
-Swap form:
-- `You pay` token selector + amount.
-- `You receive` token selector + estimated amount.
-- Max button.
-- Quote provider/route and refresh time.
-- Price impact.
-- Slippage tolerance.
-- Minimum received.
-- Network fee only if available.
-
-Review panel:
-- Input/output token addresses (expandable).
-- Route/pool details.
-- Hook policy status.
-- Slippage and minimum output.
-- Quote expiry.
-
-Action: `Review swap` → confirmation step → wallet signature → transaction pending → confirmed/failed.
-
-### Error states
-
-- Unsupported token pair.
-- No route/quote available.
-- Insufficient balance.
-- Insufficient allowance.
-- Quote expired.
-- Slippage exceeded.
-- Hook paused.
-- Swap size exceeds policy.
-- Wrong network.
-
-### Components
-
-- `TokenAmountInput`
-- `TokenSelector`
-- `SwapQuoteCard`
-- `PriceImpactIndicator`
-- `SlippageSelector`
-- `TransactionReviewDialog`
-- `SwapStatusCard`
-
-## 7.3 Liquidity positions (`/app/treasury/liquidity`)
-
-### Goal
-
-Show a merchant's actual v4 LP positions and allow supported liquidity changes.
-
-### Table columns
-
-- Position / pool.
-- Token pair.
-- Fee tier or hook/configuration where relevant.
-- Tick/range.
-- Liquidity amount.
-- Unclaimed fees (if read from authoritative position state).
-- Status.
-- Actions.
-
-### Position detail
-
-- Pool ID and PoolKey context.
-- Token pair and decimals.
-- Price range.
-- Liquidity.
-- Deposited token amounts.
-- Fee information and collection history.
-- Hook address and permissions summary.
-- Transaction links.
-
-### Add liquidity flow
-
-1. Select pool.
-2. Review token balances and price range.
-3. Enter token amounts/range.
-4. Review expected position and risks.
-5. Approve tokens if required.
-6. Submit position transaction.
-7. Show confirmed position ID and transaction evidence.
-
-### Remove liquidity flow
-
-1. Select position.
-2. Choose percentage/amount to remove.
-3. Preview returned token amounts (estimate).
-4. Explain fee collection separately if applicable.
-5. Confirm.
-6. Show transaction result.
-
-### Risk disclosure
-
-Display a concise risk note before first liquidity action: LP positions can change value, experience impermanent loss and expose the merchant to inventory risk. Fees are variable and not guaranteed.
-
-## 7.4 Hook policies (`/app/treasury/hooks`)
-
-### Goal
-
-Let authorized treasury operators inspect and configure the `TreasuryGuardHook` policies that are actually enforced by the pool.
-
-### Header
-
-`Hook policies` / `Manage the onchain rules enforced by your configured treasury pool.`
-
-### Status card
-
-- Hook address.
-- Network.
-- Pool attached.
-- Owner / admin.
-- Paused or active.
-- Last policy update.
-
-### Policy controls
-
-- Emergency pause/unpause.
-- Maximum swap input size.
-- Allowed token pair/pools if implemented.
-- Fee configuration only if the hook implements it and bounds are enforced.
-
-### Confirmation rules
-
-- Policy changes are onchain actions.
-- Show current and proposed values.
-- Require wallet signature.
-- Explain that changing a policy affects the configured pool, not all Uniswap pools.
-
-### Policy history
-
-- Change type.
-- Previous value.
-- New value.
-- Initiator.
-- Transaction ID.
-- Time.
-
-Do not add controls for features that are not implemented in the hook contract.
-
----
-
 # 8. Audit & Developer Operations
 
 ## 8.1 Audit log (`/app/audit`)
@@ -1954,7 +1668,6 @@ Provide chain-specific configuration in one technical settings area without mixi
 
 - Whitechain.
 - Hedera.
-- Uniswap network.
 
 ### Whitechain card
 
@@ -1977,15 +1690,6 @@ Provide chain-specific configuration in one technical settings area without mixi
 - HCS audit topic ID (for example `0.0.789123` only when that is the configured topic).
 - Mirror Node status.
 - Latest transaction and audit message.
-
-### Uniswap card
-
-- Selected v4 network (for example Unichain Sepolia only after verifying official support/configuration).
-- Chain ID.
-- PoolManager/Router/PositionManager deployment references.
-- Pool ID.
-- Hook address.
-- Verification status.
 
 ### Network configuration rules
 
@@ -2030,7 +1734,6 @@ Customer pages must be much simpler than the merchant console. The customer is t
 
 ### Goal
 
-Provide a safe, mobile-first checkout where a customer can pay an invoice in either of the two supported ways: **direct Whitechain USDT** or **WETH/USDC routed through the Uniswap Universal Router to the merchant's exact USDT settlement amount**, when the adapter returns a valid executable route.
 
 ### Layout
 
@@ -2056,9 +1759,6 @@ Present two calm, clearly differentiated options. The customer must understand w
 - Show wallet USDT balance and allowance/approval state.
 - Customer connects wallet, switches network if needed, approves USDT if required and pays the invoice.
 
-**Tab B — Pay with another token (Uniswap)**
-- Supported input assets: WETH or USDC only when returned by the current Uniswap routing adapter for the selected environment.
-- Route: Uniswap Universal Router / supported v4 route configured by `packages/adapter-uniswap/src/routing.ts`.
 - Show input asset and amount, live quote, price impact, slippage tolerance, minimum received, quote timestamp/expiry and route/pool details.
 - Show the exact USDT amount required by the invoice as the output/merchant settlement target. The UI must make clear that the customer spends WETH/USDC while the merchant's invoice is accounted for in USDT.
 - Before signing, show both the input token/network and the USDT settlement asset/network.
@@ -2076,8 +1776,6 @@ Present two calm, clearly differentiated options. The customer must understand w
 6. Wait for Whitechain transaction confirmation and indexing policy.
 7. View receipt.
 
-**Uniswap-routed rail**
-1. Connect a wallet supported by the configured Uniswap route.
 2. Select WETH or USDC and enter the input amount (or use the exact-output invoice target to calculate the required input).
 3. Fetch and display an executable quote from the routing adapter.
 4. Review input amount, expected exact USDT output, slippage, minimum output, route and network(s).
@@ -2106,8 +1804,6 @@ Do not let a customer click a payment action before the invoice amount, merchant
 - Invoice ID and merchant.
 - Amount due in USDT.
 - Selected payment rail.
-- Customer input asset/amount (for Uniswap rail).
-- Expected USDT output and slippage details (for Uniswap rail).
 - Settlement network and expiry.
 - Support/contact link if merchant configured one.
 
@@ -2119,7 +1815,6 @@ On mobile, summary stacks above or below the payment form.
 - Wrong network / unsupported wallet.
 - Insufficient input token or USDT balance.
 - Approval rejected or insufficient allowance.
-- No Uniswap route available.
 - Quote expired or slippage exceeded.
 - Swap reverted.
 - Swap confirmed but merchant settlement pending/failed (show as a distinct state; do not mark invoice paid).
@@ -2131,7 +1826,6 @@ Every state explains what happened and what the customer can do next.
 
 Success page:
 - Status: `Payment confirmed` only after the required merchant USDT settlement is confirmed.
-- Invoice amount in USDT and customer input asset/amount when Uniswap routing was used.
 - Merchant and invoice ID.
 - Swap transaction hash and explorer link (when applicable).
 - Whitechain USDT settlement transaction hash and explorer link.
@@ -2301,7 +1995,6 @@ The docs site is a first-class product surface. Developers need a predictable le
 3. **Issue refunds** — partial/full refunds and receipts.
 4. **Monetize an API** — x402-protected endpoints on Hedera.
 5. **Control agent spend** — budgets, allowlists and approval thresholds.
-6. **Manage treasury** — Uniswap v4 swaps, positions and hook policy.
 
 ### Prerequisites panel
 
@@ -2309,76 +2002,11 @@ The docs site is a first-class product surface. Developers need a predictable le
 - Wallet and relevant testnet funds.
 - Required network IDs and contract addresses.
 - Hedera testnet account and facilitator setup for x402.
-- Supported Uniswap v4 test network for treasury operations.
 
 Do not hardcode a version number in the docs until the package is actually released.
 
 ## 11.3 Documentation sidebar structure
 
-```text
-GETTING STARTED
-  Introduction
-  Quickstart
-  Installation
-  Configure your workspace
-  Testnet setup
-
-GUIDES
-  Customer payments
-    Create an invoice
-    Hosted checkout
-    Payment links
-    Webhooks
-  Subscriptions
-    Create a plan
-    Authorize a subscriber
-    Renewals and keepers
-    Cancel a subscription
-  Refunds and receipts
-    Issue a partial refund
-    Verify a receipt
-  Agent commerce
-    Publish a paid service
-    x402 server integration
-    Discover services
-    Build a buyer agent
-    Spending policies
-    Hedera HCS audit
-  Treasury
-    Configure a v4 network
-    Quote and execute a swap
-    Manage liquidity
-    Deploy TreasuryGuardHook
-
-SDK REFERENCE
-  Core client
-  React provider
-  Checkout components
-  Server middleware
-  Webhooks
-  Error handling
-
-API REFERENCE
-  Authentication
-  Invoices
-  Payments
-  Subscriptions
-  Refunds
-  Receipts
-  Agent services
-  Agent spend policies
-  Activity and audit
-  Treasury
-
-RESOURCES
-  Supported networks
-  Contract addresses
-  Example applications
-  Troubleshooting
-  Security best practices
-  Changelog
-  GitHub
-```
 
 ## 11.4 Quickstart (`/docs/quickstart`)
 
@@ -2553,46 +2181,6 @@ flowchart TD
 
 Success condition: invoice exists in `OPEN` state, has a unique identifier and shareable checkout link, and is visible in merchant invoice list.
 
-## 12.3 Customer: pay invoice with USDT or Uniswap-routed WETH/USDC
-
-The storefront offers two rails. Direct USDT is the simplest path; the Uniswap option demonstrates the Uniswap checkout integration and exact-output routing.
-
-```mermaid
-flowchart TD
-  A[Open storefront / invoice] --> B[Load invoice and validate merchant + amount]
-  B --> C{Invoice payable?}
-  C -- No --> D[Show expired / paid / cancelled state]
-  C -- Yes --> E[Select payment rail]
-  E --> F[Direct Whitechain USDT]
-  E --> G[Uniswap pay with WETH / USDC]
-  F --> H[Connect wallet and validate chain 1874]
-  H --> I[Check USDT balance / allowance]
-  I --> J[Approve if required]
-  J --> K[Pay invoice in USDT]
-  G --> L[Connect supported wallet / route network]
-  L --> M[Request exact-output quote for invoice USDT amount]
-  M --> N[Review input quote, slippage, min output and route]
-  N --> O[Approve WETH / USDC if required]
-  O --> P[Execute Universal Router swap]
-  K --> Q[Wait for required Whitechain settlement]
-  P --> R{Separate settlement leg required?}
-  R -- Yes --> S[Execute / monitor settlement leg]
-  R -- No --> Q
-  S --> Q
-  Q --> T{Whitechain settlement confirmed?}
-  T -- No --> U[Show pending / failed; invoice remains unpaid]
-  T -- Yes --> V[Create verified receipt]
-  V --> W[Show settlement proof and optional swap proof]
-```
-
-Acceptance checkpoints:
-- Direct rail uses the official Whitechain challenge USDT address on chain ID `1874`.
-- Uniswap rail offers only WETH/USDC routes actually returned by the routing adapter.
-- Uniswap quote shows input amount, price impact/slippage, minimum output and exact USDT output target.
-- If the swap and merchant settlement are separate operations, the UI exposes each transaction and stage. No atomic cross-chain claim.
-- Invoice is marked paid only after the required Whitechain USDT settlement is confirmed and indexed under the configured policy.
-- The demo shows both customer rails and the corresponding merchant record/evidence.
-
 ## 12.4 Merchant: create and operate a subscription
 
 ```mermaid
@@ -2733,32 +2321,6 @@ flowchart TD
 
 The refund UI must use the original payer identity, show HBAR and tinybars, and link the actual Hedera transaction on HashScan. Do not offer this control as active until a real refund adapter path is implemented and tested.
 
-## 12.9 Merchant: treasury swap through Uniswap v4
-
-```mermaid
-flowchart TD
-  A[Treasury] --> B[Select supported network]
-  B --> C[Load wallet balances and pool status]
-  C --> D[Open Swap]
-  D --> E[Choose tokens and amount]
-  E --> F[Fetch quote and route]
-  F --> G[Review slippage, min received and hook policy]
-  G --> H[Confirm swap]
-  H --> I[Wallet signs transaction]
-  I --> J[Hook evaluates configured rules]
-  J --> K{Policy allows swap?}
-  K -- No --> L[Transaction reverts; explain rule]
-  K -- Yes --> M[Swap settles]
-  M --> N[Indexer records treasury event]
-  N --> O[Show tx evidence in activity]
-```
-
-Acceptance checkpoints:
-- Real v4 pool/route and real transaction.
-- Hook is attached to the pool and its actual configured rule is exercised.
-- A successful and a rejected policy path are demonstrable.
-- Whitechain funds are not shown as automatically available in this treasury.
-
 ## 12.10 Merchant: export audit/accounting data
 
 1. Open Audit Log.
@@ -2832,7 +2394,6 @@ Build a small, coherent design system. Do not create a different table, status b
 
 | Component | Used in | Responsibility |
 |---|---|---|
-| `PulsePayCheckout` | Current React SDK / storefront | Dual-rail customer checkout: direct USDT or supported Uniswap-routed WETH/USDC |
 | `InvoiceSummaryCard` | Invoice and checkout | Amount, due date, merchant and status |
 | `SubscriptionStatusPanel` | Subscription detail/portal | Plan, next charge and cancellation state |
 | `RefundabilitySummary` | Refund flow | Paid, refunded, remaining, reserve available |
@@ -2845,7 +2406,6 @@ Build a small, coherent design system. Do not create a different table, status b
 | `TreasuryBalanceList` | Treasury | Network-scoped token balances |
 | `SwapPanel` | Treasury swap | Quote, slippage, route, min output |
 | `LiquidityPositionCard` | Treasury | Pool, range, position, fees, risk |
-| `HookPolicyPanel` | Uniswap & Treasury tab | Pause/max size/current owner and configured rules |
 | `MerchantBillingDashboard` | Current React SDK / merchant console | Drop-in merchant billing operations UI |
 | `UniversalCheckoutRailSelector` | `PulsePayCheckout` | Direct USDT vs WETH/USDC exact-output route with quote/slippage details |
 | `ReservePayoutSummary` | Reserves & Payouts tab | Refund reserve, available net proceeds and withdrawal state |
@@ -3167,22 +2727,18 @@ Seed:
 - One x402 API service: `Market Data Snapshot`.
 - One real Hedera testnet x402 payment after the agent demo succeeds.
 - One buyer agent policy with a clear daily budget and per-request cap.
-- One configured Uniswap v4 pool and hook after deployment.
 
 Any sample/demo item without an actual transaction should display `Demo data` or `Sample` and must not use a real-looking explorer link.
 
 ## 19.2 Judge mode
 
 Optional top-bar `Demo guide` action opens a concise checklist:
-1. Open the storefront and compare the direct USDT and Uniswap WETH/USDC checkout rails.
 2. Pay an invoice with official Whitechain test USDT.
-3. Execute the Uniswap Universal Router route and show the input quote, slippage, minimum output and exact USDT target.
 4. View the merchant payment record and the customer receipt.
 5. Issue a partial Whitechain refund and verify its explorer evidence.
 6. Open **Subscriptions** and show active state, keeper renewal and cancellation.
 7. Open **AI Agent Commerce** and show the x402 manifest, native HBAR price, asset `0.0.0`, daily budget and per-request cap.
 8. Run the autonomous buyer agent; show the Hedera transaction in HashScan and the HCS topic/sequence reference.
-9. Open **Uniswap & Treasury** and demonstrate the v4 hook pause/max-swap-limit rule.
 10. Open **Reserves & Payouts** and show reserve held vs available net proceeds.
 11. Open **Developer & Webhooks**, run the webhook simulator and export `/api/export.csv`.
 
@@ -3219,13 +2775,6 @@ P0 is defined by the seven tabs and judge flows, not by a separate route per fea
 - [ ] Run or demonstrate keeper renewal without implying contracts self-execute.
 - [ ] Customer/merchant cancellation state is clear and confirmed.
 
-### 4. Uniswap & Treasury
-- [ ] Universal checkout rail offers WETH/USDC only when a real route is returned by `packages/adapter-uniswap/src/routing.ts`.
-- [ ] Checkout shows input quote, slippage, minimum received and exact USDT output target.
-- [ ] Treasury swap modal executes a real supported Uniswap v4 route.
-- [ ] `TreasuryGuardHook` shows pause state and maximum swap limit; demonstrate a real allowed/rejected outcome.
-- [ ] Swap and Whitechain settlement evidence remain separate if they are separate transactions.
-
 ### 5. AI Agent Commerce (Hedera)
 - [ ] Publish/discover x402 endpoint and show `/.well-known/x402.json`.
 - [ ] Price in native HBAR, asset identifier `0.0.0`, HBAR/tinybar display and integer-safe conversion.
@@ -3245,7 +2794,6 @@ P0 is defined by the seven tabs and judge flows, not by a separate route per fea
 - [ ] Show the real React SDK components: `<PulsePayCheckout />`, `<Receipt />` and `<MerchantBillingDashboard />`.
 - [ ] API key/integration area only exposes actual configured key operations.
 - [ ] Webhook simulator demonstrates a real event payload and result.
-- [ ] `/api/export.csv` exports normalized Whitechain, Hedera and Uniswap records with chain-specific evidence columns.
 - [ ] README explains setup, architecture, current limitations and at least one real qualifying transaction per target track.
 
 ### Cross-cutting release gate
@@ -3286,7 +2834,6 @@ P0 is defined by the seven tabs and judge flows, not by a separate route per fea
 2. **Whitechain vertical slice.** Invoice → hosted checkout → paid payment detail → refund → customer receipt.
 3. **Subscriptions.** Plan → customer authorization → keeper renewal state → cancellation.
 4. **Hedera vertical slice.** Publish service → 402 → buyer agent policy → facilitator settlement → activity detail → HCS evidence.
-5. **Uniswap vertical slice.** Treasury network → quote → real v4 swap → hook policy success/failure evidence.
 6. **Shared ledger and exports.** Normalize all records and make audit references clear.
 7. **Docs and demo polish.** Ensure the actual implementation matches every example and every displayed control.
 
@@ -3329,7 +2876,6 @@ Use this as a design and implementation checklist. A page is not complete merely
 | Agents & Policies | Control agent spend | Agent table + policy editor | Within budget, blocked, paused | P0 |
 | AI Agent Commerce activity | Inspect autonomous requests | Activity table | 402, policy blocked, settled, failed | P0 |
 | Agent Request Detail | Prove x402 flow | Request timeline + HashScan | Each lifecycle stage | P0 |
-| Uniswap & Treasury | Inspect v4 assets/pools | Balances + positions | Unconfigured, connected, error | P0 |
 | Swap | Execute v4 swap | Swap panel | Quote, stale quote, signing, settled, reverted | P0 |
 | Liquidity | Manage v4 positions | Position table | Empty, active, remove/add pending | P1 |
 | Hook Policies | Configure guard rules | Policy panel | Active, paused, update pending | P0 |
@@ -3342,7 +2888,6 @@ Use this as a design and implementation checklist. A page is not complete merely
 | Contract Addresses & Networks | Inspect configured chain/contract references inside Developer & Webhooks | Network/contract cards | Connected, misconfigured, unavailable | P0 |
 | Notifications | Configure alerts | Preference form | Saved, disabled channel | P2 |
 | Security | Inspect access controls | Security settings | Connected sessions, warning | P2 |
-| Hosted Checkout | Customer pays with either rail | `PulsePayCheckout` | Direct USDT or Uniswap quote/approval/pending/settlement states | P0 |
 | Payment Result | Confirm payment state | Result panel | Pending, confirmed, failed | P0 |
 | Receipt | Verify payment/refund | Receipt card + evidence | Paid, partial, full, indexing | P0 |
 | Subscription Portal | Inspect/cancel subscription | Subscription panel | Active, cancelling, cancelled | P0 |
@@ -3391,7 +2936,6 @@ The product should sound like financial software: direct, calm and specific. Avo
 
 **Treasury**  
 `No treasury pool configured`  
-`Connect a supported Uniswap v4 network and configure a pool to view balances and positions.`
 
 **Audit log**  
 `No audit events yet`  
@@ -3409,7 +2953,6 @@ The product should sound like financial software: direct, calm and specific. Avo
 `Pausing this agent prevents new payment attempts from being authorized by PulsePay. Transactions already signed or submitted may still settle.`
 
 **Treasury swap:**  
-`Review the route, minimum amount received and hook policy before signing. The transaction will execute on the selected Uniswap network.`
 
 ---
 
@@ -3485,25 +3028,20 @@ The complete design reference is intentionally broader than the hackathon build.
 1. **Overview:** KPIs, recent activity, reserve/net-proceeds summary and setup state.
 2. **Sales & Invoices:** create invoice, customer payment records, refund modal and payment evidence.
 3. **Subscriptions:** active subscriptions, renewal/keeper trigger and cancel state.
-4. **Uniswap & Treasury:** Uniswap v4 swap modal, LP position, `TreasuryGuardHook` status, circuit-breaker pause and max swap limit.
 5. **AI Agent Commerce:** discoverable x402 endpoint, native HBAR pricing, daily budget, per-request cap, agent activity and HCS topic configuration.
 6. **Reserves & Payouts:** refund reserve pool (`reserveHeldUsdt`), configured reserve ratio, available net proceeds and withdraw action.
 7. **Developer & Webhooks:** SDK/API keys, webhook simulator, CSV export and contract addresses.
 
 ### Minimum polished judge journey
 
-1. Open the customer storefront and show the checkout's two payment rails: direct Whitechain USDT and WETH/USDC through the Uniswap Universal Router when an executable quote is available.
 2. Demonstrate a direct payment using the official Whitechain Sepolia USDT, then show the invoice/payment record in **Sales & Invoices**.
-3. Run the Uniswap checkout rail: show a real WETH/USDC quote, price impact/slippage, minimum output and exact USDT invoice target; show all transaction stages and evidence. Do not call it paid before the required Whitechain settlement confirms.
 4. From **Sales & Invoices**, issue a partial refund to the original payer and show the real Whitechain refund transaction.
 5. Open `/receipt/:id` and verify the original payment and refund proof.
 6. Open **Subscriptions**, show the plan/active subscription, keeper renewal operation and cancel-anytime state.
 7. Open **AI Agent Commerce**, show the x402 manifest, service priced in native HBAR (`asset: "0.0.0"`), example `0.50 HBAR = 50,000,000 tinybars`, and the configured daily budget/per-request cap.
 8. Run a buyer agent that discovers the service, receives HTTP 402, passes `PulsePaySpendLimitPolicy` / Hedera Agent Kit v4 checks, pays in HBAR without human approval and receives the protected resource.
 9. Show the actual Hedera transaction on HashScan and the HCS topic/sequence record (use the configured topic; `0.0.789123` is only the demo example).
-10. Open **Uniswap & Treasury**, execute a real v4 swap and demonstrate `TreasuryGuardHook` policy enforcement, including a pause or max-swap-limit rejection path.
 11. Open **Reserves & Payouts**, show the current reserve pool, actual configured reserve ratio, available net proceeds and a confirmed withdrawal if implemented.
-12. Open **Developer & Webhooks**, run the webhook simulator and download `/api/export.csv` with normalized Whitechain, Hedera and Uniswap records.
 
 ### Final product-design recommendation
 
@@ -3513,7 +3051,6 @@ Keep the seven-tab console calm and operational. Merchants should understand wha
 
 | Track requirement / feature | Product surface | Primary screen(s) | Evidence shown |
 |---|---|---|---|
-| Drop-in business checkout | SDK + customer surface | `/`, `<PulsePayCheckout />` | Direct USDT payment and Uniswap WETH/USDC exact-output route evidence |
 | Merchant and customer views | Dashboard + customer pages | Payment detail, receipt | Matching payment status |
 | USDT payment on Whitechain Sepolia | Whitechain adapter | Direct checkout rail, Sales & Invoices | Explorer link and official challenge token |
 | Invoice / payment link | Business dashboard | Invoices, invoice detail | Shareable hosted link |
@@ -3527,12 +3064,8 @@ Keep the seven-tab console calm and operational. Merchants should understand wha
 | HCS tamper-evident log | Dashboard / audit evidence | AI Agent Commerce | Configured HCS topic ID (demo example `0.0.789123`), sequence/message reference and HashScan tx |
 | Agent identity / reputation bonus | Agent commerce | Agent detail | HCS-14/ERC-8004 reference if integrated |
 | Multi-agent negotiation bonus | Agent commerce | Agent activity | Negotiation trace if implemented |
-| Pay with WETH/USDC | Customer checkout | `/` → Uniswap rail | Adapter quote, slippage, minimum output, exact USDT output target and settlement proof |
 | Native HBAR x402 payment | AI Agent Commerce | x402 agent flow | Asset `0.0.0`, tinybar amount and HashScan transaction |
 | Reserve accounting and payout | Whitechain merchant operations | Reserves & Payouts tab | `reserveHeldUsdt`, configured reserve ratio, available net proceeds and withdrawal tx |
-| Uniswap stack integration | Customer checkout + treasury | `/` Uniswap rail; Uniswap & Treasury tab | Universal Router quote/swap evidence and real v4 treasury transaction |
-| Custom v4 hook | Treasury | Uniswap & Treasury tab | `TreasuryGuardHook` address/state, max swap limit and pass/reject result |
-| Uniswap feedback requirement | Developer resources | Docs / repo references | `FEEDBACK.md` and submitted form |
 
 ---
 
@@ -3643,7 +3176,6 @@ apps/
 # Appendix C — Non-Negotiable UI Rules
 
 1. The merchant dashboard at `/merchant` has a persistent left sidebar on desktop with exactly seven MVP tabs.
-2. The seven tabs are Overview, Sales & Invoices, Subscriptions, Uniswap & Treasury, AI Agent Commerce, Reserves & Payouts, and Developer & Webhooks.
 3. Navigation is organized around merchant workflows, not chain brands.
 4. The environment (`Testnet`/`Mainnet`) is visible on the merchant console.
 5. Chain-specific context is scoped to each module and transaction.
@@ -3653,8 +3185,6 @@ apps/
 9. Subscription cancellation is easy to locate and its effect is clearly described.
 10. Native Hedera x402 spend is shown in HBAR and tinybars with asset ID `0.0.0`; policy checks happen before signing.
 11. HCS topic configuration is environment-specific; show the real topic and sequence reference.
-12. Uniswap treasury balances are never blended with Whitechain customer receivables.
-13. Uniswap checkout displays the WETH/USDC input, exact USDT settlement target, slippage and each transaction stage.
 14. Reserve pool and withdrawable proceeds have a dedicated tab and are read from authoritative contract/accounting state.
 15. HCS audit pending is not the same as payment failed.
 16. The public customer checkout is simple, mobile-first and free of merchant-dashboard navigation.
@@ -3666,5 +3196,3 @@ apps/
 ---
 
 ## Revision 1.1 — Repository alignment update (6 November 2026)
-
-This revision aligns the original UI specification with the supplied repository review. The canonical MVP is now the seven-tab `/merchant` console; checkout explicitly includes direct Whitechain USDT and Uniswap-routed WETH/USDC; the Hedera experience uses native HBAR/tinybars with `PulsePaySpendLimitPolicy`, Hedera Agent Kit v4 controls and configured HCS evidence; and Reserves & Payouts is a first-class tab. Appendix B is now explicitly a post-hackathon v2 roadmap.

@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const project = process.argv[2];
-if (!['whitechain', 'uniswap-v4', 'hedera'].includes(project)) throw new Error('Unknown contract project');
+if (!['whitechain', 'hedera'].includes(project)) throw new Error('Unknown contract project');
 const localForge = `${root}.bin/forge`;
 const localSolc = `${root}.bin/solc`;
 const result = spawnSync(existsSync(localForge) ? localForge : 'forge', [

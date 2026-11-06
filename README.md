@@ -1,6 +1,6 @@
 # PulsePay
 
-PulsePay combines a Whitechain USDT merchant contract and TypeScript SDK, a Uniswap v4 treasury guard, and a native Hedera HTTP-402 payment flow.
+PulsePay combines a Whitechain USDT merchant contract and TypeScript SDK, Chainlink CCIP 2.0 cross-chain token bridging, and a native Hedera HTTP-402 payment flow.
 
 ## Official NPM packages
 
@@ -18,7 +18,7 @@ npm install @pulsepay/sdk-server @pulsepay/shared
 
 # Chain & protocol adapters
 npm install @pulsepay/adapter-whitechain viem
-npm install @pulsepay/adapter-uniswap viem
+npm install @pulsepay/adapter-ccip viem
 npm install @pulsepay/adapter-hedera @hashgraph/hedera-agent-kit @hiero-ledger/sdk viem
 ```
 
@@ -29,13 +29,13 @@ npm install @pulsepay/adapter-hedera @hashgraph/hedera-agent-kit @hiero-ledger/s
 | [`@pulsepay/sdk-server`](packages/sdk-server) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/sdk-server)](https://www.npmjs.com/package/@pulsepay/sdk-server) | Server middleware, x402 resource server gateway, and webhooks |
 | [`@pulsepay/shared`](packages/shared) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/shared)](https://www.npmjs.com/package/@pulsepay/shared) | Shared schemas, Zod types, and accountant CSV formatters |
 | [`@pulsepay/adapter-whitechain`](packages/adapter-whitechain) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-whitechain)](https://www.npmjs.com/package/@pulsepay/adapter-whitechain) | Whitechain EVM client, ABI bindings, and indexer |
-| [`@pulsepay/adapter-uniswap`](packages/adapter-uniswap) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-uniswap)](https://www.npmjs.com/package/@pulsepay/adapter-uniswap) | Uniswap Trading API routing & Uniswap v4 treasury guard |
+| [`@pulsepay/adapter-ccip`](packages/adapter-ccip) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-ccip)](https://www.npmjs.com/package/@pulsepay/adapter-ccip) | Chainlink CCIP 2.0 cross-chain token bridging adapter |
 | [`@pulsepay/adapter-hedera`](packages/adapter-hedera) | `1.0.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-hedera)](https://www.npmjs.com/package/@pulsepay/adapter-hedera) | Hedera Agent Kit v4 spend policy, HCS audit hook & x402 |
 
 ## What works
 
 - **Whitechain:** invoices, reserve-backed refunds, subscriptions and balances in `PulsePayMerchantHub.sol`. The SDK provides transaction encoders and direct USDT wallet checkout. Checkout confirms the wallet/RPC network, reads the actual invoice, approves only its amount when needed, and reports success only after a matching settlement event.
-- **Uniswap:** server-side exact-output Trading API quotes with validated addresses, amounts and responses. No simulated fallback is returned. The treasury hook permits exact-input trades in one configured ERC-20 input currency and checks its raw-unit limit. Exact-output trades and other input currencies are rejected.
+- **Chainlink CCIP 2.0:** token-only cross-chain bridging across Ethereum Sepolia, Arbitrum Sepolia and Hedera Testnet using official CCIP Routers with zero callback gas overhead (`gasLimit = 0`, `data = ""`).
 - **Hedera:** native HBAR receipt payments plus a chain-296 merchant hub with finite HSS-scheduled subscriptions and challenge-bound EVM invoice payments. The EVM agent validates the live invoice, enforces a durable token budget, approves the exact amount, and the server unlocks the resource only after decoding a matching Mirror Node `PaymentSettled` log. Both HTTP-402 schemes are PulsePay extensions, not standardized facilitator interoperability.
 
 ## Hedera hackathon quickstart
@@ -170,7 +170,7 @@ Application scripts load the root `.env` automatically and use the repository ro
 
 The supervisor runs the installed Node CLIs directly and excludes production web builds from its watcher. An `npx`-backed `pnpm` wrapper is rejected before any build starts, preventing recursive launcher processes. `pnpm test:dev` checks both normal startup validation and rejection of that wrapper.
 
-The new UI lives in [apps/web](apps/web/README.md). Configure `WHITECHAIN_MERCHANT_HUB_ADDRESS`, `PULSEPAY_MERCHANT_ADDRESS`, `UNISWAP_TREASURY_HOOK_ADDRESS`, `HEDERA_AUDIT_TOPIC_ID`, and `PULSEPAY_SERVICE_URL` for the real integrations you use. Unconfigured reads show a retryable error; the frontend has no simulated settlement fallback.
+The new UI lives in [apps/web](apps/web/README.md). Configure `WHITECHAIN_MERCHANT_HUB_ADDRESS`, `PULSEPAY_MERCHANT_ADDRESS`, `HEDERA_AUDIT_TOPIC_ID`, and `PULSEPAY_SERVICE_URL` for the real integrations you use. Unconfigured reads show a retryable error; the frontend has no simulated settlement fallback.
 
 ## Verification
 
@@ -202,10 +202,9 @@ Tests use temporary files, mock payment submitters and local EVM execution. They
 | `GET /api/export.csv` | Merchant | Verified payments only |
 | `GET /api/hedera/payments` | Merchant | Verified payment records, without challenge secrets or saved response data |
 | `GET /api/whitechain/invoices/:bytes32` | Merchant | Real contract invoice read using configured hub/RPC |
-| `POST /api/uniswap/quote` | Merchant | Server-side exact-output quote on `UNISWAP_CHAIN_ID` |
-| `GET /api/treasury/policy` | Merchant | Real hook policy, including `limitCurrency` |
+| `POST /api/bridge/quote` | Merchant | Real-time Chainlink CCIP 2.0 bridge fee quote |
 
-The quote endpoint accepts `tokenInAddress`, `tokenInSymbol`, `tokenInDecimals`, `tokenOutAddress`, `targetUsdtAmountUnits` (integer string), `payerAddress`, and optional `slippageTolerancePercent`. It prepares no payment and never broadcasts a swap. Keep the API key on the server. The current request contract follows the [official Uniswap quote API](https://developers.uniswap.org/docs/api-reference/aggregator_quote).
+The bridge endpoint accepts `destinationChainId` (or `destinationChainSelector`), `tokenAddress`, `amountUnits` (integer string), and `recipientAddress`. It quotes the required CCIP network fee directly from the configured CCIP Router without broadcasting transactions.
 
 ## React checkout
 
@@ -241,10 +240,9 @@ One server and one buyer worker may own their respective state files. Ownership 
 
 Unused challenges expire and are pruned; active challenges are capped at 1,000 and total retained records at 10,000. Saved resource responses are limited to 64 KiB. Capacity exhaustion fails closed and requires merchant maintenance/migration; redeemed identifiers are never silently dropped. HTTP requests and sign-in/challenge creation are rate-limited, and request bodies are bounded.
 
-## Treasury deployment changes
+## Integration review
 
-The corrected hook constructor adds `limitCurrency`. Existing deployed bytecode does not acquire these protections automatically: deploy a new hook and configure a pool with it before live use. The deployment script requires `DEPLOYER_ADDRESS`, `TREASURY_INPUT_TOKEN`, and `TREASURY_MAX_INPUT_UNITS`. The token must be an existing ERC-20 on Unichain Sepolia; its amount is in that token's base units, with no assumed decimal count. The script validates chain 1301 and retains deterministic CREATE2 salt mining.
 
 No deployments or onchain transactions are part of the local repair/verification workflow.
 
-[Original audit and remediation status](docs/CONFIGURATION_AUDIT.md) · [Whitechain feedback](WHITECHAIN_FEEDBACK.md) · [Uniswap feedback](FEEDBACK.md)
+[Original audit and remediation status](docs/CONFIGURATION_AUDIT.md) · [Whitechain feedback](WHITECHAIN_FEEDBACK.md) · [Integration audit](docs/CCIP_REVIEW.md)

@@ -45,7 +45,7 @@ test('removed previews cannot be re-enabled and never return fabricated settleme
  const state=await (await call('/api/merchant/state')).json();
  assert.equal(state.mode,'LIVE_HEDERA');
  assert.equal(state.totalHbarTinybars,'0');
- for(const field of ['invoices','subscriptions','uniswap','metrics','webhooks'])assert.equal(field in state,false,field);
+ for(const field of ['invoices','subscriptions','metrics','webhooks'])assert.equal(field in state,false,field);
  const home=await (await fetch(base)).text();
  assert.match(home,/PulsePay payment API/);
  assert.ok(!home.includes('inv_acme_pro_001'));

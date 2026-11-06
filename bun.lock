@@ -30,8 +30,8 @@
       "name": "pulsepay-demo-store",
       "version": "1.0.0",
       "dependencies": {
+        "@pulsepay/adapter-ccip": "workspace:*",
         "@pulsepay/adapter-hedera": "workspace:*",
-        "@pulsepay/adapter-uniswap": "workspace:*",
         "@pulsepay/sdk-core": "workspace:*",
         "@pulsepay/sdk-server": "workspace:*",
         "@pulsepay/shared": "workspace:*",
@@ -46,8 +46,8 @@
       "name": "pulsepay-sdk-demo",
       "version": "1.0.0",
       "dependencies": {
+        "@pulsepay/adapter-ccip": "workspace:*",
         "@pulsepay/adapter-hedera": "workspace:*",
-        "@pulsepay/adapter-uniswap": "workspace:*",
         "@pulsepay/adapter-whitechain": "workspace:*",
         "@pulsepay/sdk-core": "workspace:*",
         "@pulsepay/sdk-server": "workspace:*",
@@ -65,7 +65,7 @@
       "dependencies": {
         "@fontsource-variable/space-grotesk": "^5.2.10",
         "@fontsource/jetbrains-mono": "^5.2.8",
-        "@pulsepay/adapter-uniswap": "workspace:*",
+        "@pulsepay/adapter-ccip": "workspace:*",
         "@pulsepay/adapter-whitechain": "workspace:*",
         "@pulsepay/sdk-core": "workspace:*",
         "@pulsepay/sdk-server": "workspace:*",
@@ -90,6 +90,17 @@
         "typescript": "^5.7.3",
       },
     },
+    "packages/adapter-ccip": {
+      "name": "@pulsepay/adapter-ccip",
+      "version": "1.0.0",
+      "dependencies": {
+        "@pulsepay/shared": "workspace:*",
+        "viem": "^2.23.0",
+      },
+      "devDependencies": {
+        "typescript": "^5.7.3",
+      },
+    },
     "packages/adapter-hedera": {
       "name": "@pulsepay/adapter-hedera",
       "version": "1.0.0",
@@ -102,17 +113,6 @@
       },
       "devDependencies": {
         "@types/node": "^22.0.0",
-        "typescript": "^5.7.3",
-      },
-    },
-    "packages/adapter-uniswap": {
-      "name": "@pulsepay/adapter-uniswap",
-      "version": "1.0.0",
-      "dependencies": {
-        "@pulsepay/shared": "workspace:*",
-        "viem": "^2.23.0",
-      },
-      "devDependencies": {
         "typescript": "^5.7.3",
       },
     },
@@ -131,7 +131,7 @@
       "name": "@pulsepay/sdk-core",
       "version": "1.0.0",
       "dependencies": {
-        "@pulsepay/adapter-uniswap": "workspace:*",
+        "@pulsepay/adapter-ccip": "workspace:*",
         "@pulsepay/adapter-whitechain": "workspace:*",
         "@pulsepay/shared": "workspace:*",
       },
@@ -258,7 +258,7 @@
 
     "@js-sdsl/ordered-map": ["@js-sdsl/ordered-map@4.4.2", "", {}, "sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw=="],
 
-    "@noble/ciphers": ["@noble/ciphers@2.2.0", "", {}, "sha512-Z6pjIZ/8IJcCGzb2S/0Px5J81yij85xASuk1teLNeg75bfT07MV3a/O2Mtn1I2se43k3lkVEcFaR10N4cgQcZA=="],
+    "@noble/ciphers": ["@noble/ciphers@1.3.0", "", {}, "sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw=="],
 
     "@noble/curves": ["@noble/curves@1.9.1", "", { "dependencies": { "@noble/hashes": "1.8.0" } }, "sha512-k11yZxZg+t+gWvBbIswW0yoJlu8cHOC7dhunwOzoWH/mXGBiYyR4YY6hAEK/3EUs4UpB8la1RfdRpeGsFHkWsA=="],
 
@@ -288,9 +288,9 @@
 
     "@protobufjs/utf8": ["@protobufjs/utf8@1.1.2", "", {}, "sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug=="],
 
-    "@pulsepay/adapter-hedera": ["@pulsepay/adapter-hedera@workspace:packages/adapter-hedera"],
+    "@pulsepay/adapter-ccip": ["@pulsepay/adapter-ccip@workspace:packages/adapter-ccip"],
 
-    "@pulsepay/adapter-uniswap": ["@pulsepay/adapter-uniswap@workspace:packages/adapter-uniswap"],
+    "@pulsepay/adapter-hedera": ["@pulsepay/adapter-hedera@workspace:packages/adapter-hedera"],
 
     "@pulsepay/adapter-whitechain": ["@pulsepay/adapter-whitechain@workspace:packages/adapter-whitechain"],
 
@@ -336,7 +336,7 @@
 
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.1", "", {}, "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw=="],
 
-    "@scure/base": ["@scure/base@2.2.0", "", {}, "sha512-b8XEupJibegiXV+tDUseI8oLQc8ei3d/4Jkb2RpbHh3MfE054ov3uIz2dhFkB3FI8iwYkEh0gGCApkrYggkPNg=="],
+    "@scure/base": ["@scure/base@1.2.6", "", {}, "sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg=="],
 
     "@scure/bip32": ["@scure/bip32@1.7.0", "", { "dependencies": { "@noble/curves": "1.9.1", "@noble/hashes": "1.8.0", "@scure/base": "1.2.6" } }, "sha512-E4FFX/N3f4B80AKWp5dP6ow+flD1LQZo/w8UnLGYZO674jS6YnYeepycOOksv+vLPSpgN35wgKgy+ybfTb2SMw=="],
 
@@ -928,9 +928,13 @@
 
     "@grpc/proto-loader/protobufjs": ["protobufjs@7.6.6", "", { "dependencies": { "@protobufjs/aspromise": "1.1.2", "@protobufjs/base64": "1.1.2", "@protobufjs/codegen": "2.0.5", "@protobufjs/eventemitter": "1.1.1", "@protobufjs/fetch": "1.1.1", "@protobufjs/float": "1.0.2", "@protobufjs/path": "1.1.2", "@protobufjs/pool": "1.1.0", "@protobufjs/utf8": "1.1.2", "@types/node": "22.20.5", "long": "5.3.2" } }, "sha512-dYDWdjSl5RNb7SgPxGQcRU+GtvP7s2fpkrY0r432PcOIaZ0/rBcxEZnQN67iJhFuQiVw754JDoPruPCNdGsbjg=="],
 
+    "@hiero-ledger/cryptography/@noble/ciphers": ["@noble/ciphers@2.2.0", "", {}, "sha512-Z6pjIZ/8IJcCGzb2S/0Px5J81yij85xASuk1teLNeg75bfT07MV3a/O2Mtn1I2se43k3lkVEcFaR10N4cgQcZA=="],
+
     "@hiero-ledger/cryptography/@noble/curves": ["@noble/curves@2.2.0", "", { "dependencies": { "@noble/hashes": "2.2.0" } }, "sha512-T/BoHgFXirb0ENSPBquzX0rcjXeM6Lo892a2jlYJkqk83LqZx0l1Of7DzlKJ6jkpvMrkHSnAcgb5JegL8SeIkQ=="],
 
     "@hiero-ledger/cryptography/@noble/hashes": ["@noble/hashes@2.2.0", "", {}, "sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg=="],
+
+    "@hiero-ledger/cryptography/@scure/base": ["@scure/base@2.2.0", "", {}, "sha512-b8XEupJibegiXV+tDUseI8oLQc8ei3d/4Jkb2RpbHh3MfE054ov3uIz2dhFkB3FI8iwYkEh0gGCApkrYggkPNg=="],
 
     "@hiero-ledger/cryptography/@scure/bip32": ["@scure/bip32@2.2.0", "", { "dependencies": { "@noble/curves": "2.2.0", "@noble/hashes": "2.2.0", "@scure/base": "2.2.0" } }, "sha512-zFr7t2F+a9+5tB7QbarF2HQNYrgjCNaoLAupZdKkrFMYMozJf5zqH2WJCQibMzm1qQ0QogrxVGO3qXfQDYMaQg=="],
 
@@ -939,10 +943,6 @@
     "@hiero-ledger/sdk/bignumber.js": ["bignumber.js@11.1.2", "", {}, "sha512-9idDyC15Vpk+53w4OfxEu2PqHSKFQUffrH1oTvnkJ9fduTJ032tpuI2sxS04oCzocklokWUZmWVEkTEQdLmUOQ=="],
 
     "@hiero-ledger/sdk/ethers": ["ethers@6.16.0", "", { "dependencies": { "@adraffy/ens-normalize": "1.10.1", "@noble/curves": "1.2.0", "@noble/hashes": "1.3.2", "@types/node": "22.7.5", "aes-js": "4.0.0-beta.5", "tslib": "2.7.0", "ws": "8.21.0" } }, "sha512-U1wulmetNymijEhpSEQ7Ct/P/Jw9/e7R1j5XIbPRydgV2DjLVMsULDlNksq3RQnFgKoLlZf88ijYtWEXcPa07A=="],
-
-    "@scure/bip32/@scure/base": ["@scure/base@1.2.6", "", {}, "sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg=="],
-
-    "@scure/bip39/@scure/base": ["@scure/base@1.2.6", "", {}, "sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg=="],
 
     "@typescript-eslint/eslint-plugin/ignore": ["ignore@7.0.14", "", {}, "sha512-wCBiZ77u1tuWde6G/nfOtLaCTYcFDU5yCzARzK10y+rLhzYoL7a7yEemcopcc2Mzow7gZOIjnV2ym1NYmdiJOQ=="],
 
@@ -959,8 +959,6 @@
     "ethers/@noble/hashes": ["@noble/hashes@1.3.2", "", {}, "sha512-MVC8EAQp7MvEcm30KWENFjgR+Mkmf+D189XJTkFIlwohU5hcBbn1ZkKq7KVTi2Hme3PMGF390DaL52beVrIihQ=="],
 
     "ethers/@types/node": ["@types/node@22.7.5", "", { "dependencies": { "undici-types": "6.19.8" } }, "sha512-jML7s2NAzMWc//QSJ1a3prpk78cOPchGvXJsC3C6R6PSMoooztvRVQEz89gmBTBY1SPMaqo5teB4uNHPdetShQ=="],
-
-    "ox/@noble/ciphers": ["@noble/ciphers@1.3.0", "", {}, "sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw=="],
 
     "pvtsutils/tslib": ["tslib@2.9.1", "", {}, "sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA=="],
 

@@ -33,21 +33,21 @@ All packages are published under the `@pulsepay` scope on the npm registry:
 | `@pulsepay/sdk-react` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/sdk-react) | Drop-in React checkout widget & billing components |
 | `@pulsepay/sdk-server` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/sdk-server) | Server middleware, x402 resource server gateway, and webhooks |
 | `@pulsepay/adapter-whitechain` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/adapter-whitechain) | Whitechain EVM client & contract ABI bindings |
-| `@pulsepay/adapter-uniswap` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/adapter-uniswap) | Uniswap Trading API routing & v4 treasury adapter |
+| `@pulsepay/adapter-ccip` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/adapter-ccip) | Chainlink CCIP 2.0 cross-chain token bridging |
 | `@pulsepay/adapter-hedera` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/adapter-hedera) | Hedera Agent Kit v4 spend policy & HCS audit hook |
 | `@pulsepay/shared` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/shared) | Shared schemas, Zod types, and accountant CSV utilities |
 
 ## 04 / Walkthrough
 
-Whitechain records invoices and USDT settlement. Uniswap supplies exact-output quotes and a v4 treasury hook. Hedera handles native HBAR HTTP-402 receipts and HCS audit messages. These paths are independent: a Uniswap swap cannot currently bridge into a Whitechain invoice.
+Whitechain records invoices and USDT settlement. Chainlink CCIP 2.0 provides cross-chain token bridging across testnets. Hedera handles native HBAR HTTP-402 receipts and HCS audit messages.
 
-Read README.md before configuring a deployment. Start with direct USDT checkout or the native HBAR flow, then add treasury controls as needed.
+Read README.md before configuring a deployment. Start with direct USDT checkout or the native HBAR flow, then add cross-chain token bridging as needed.
 
 ## 05 / Anatomy
 
 | Class or file | Responsibility |
 | --- | --- |
-| `PulsePayClient` | Unified SDK entry point; whitechain, routing and optional treasury adapters |
+| `PulsePayClient` | Unified SDK entry point; whitechain and CCIP bridge adapters |
 
 Source: [README.md](https://github.com/lviffy/ETHGLOBAL/blob/main/README.md).
 

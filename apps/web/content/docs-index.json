@@ -80,28 +80,12 @@
     "track": "Whitechain"
   },
   {
-    "group": "Uniswap",
-    "slug": "uniswap/universal-checkout",
-    "title": "Exact output, clear boundaries.",
-    "lede": "Quote the input needed for an exact output amount through the server-side Uniswap Trading API. Keep the API key on the server.",
-    "source": "packages/adapter-uniswap/src/routing.ts",
-    "track": "Uniswap"
-  },
-  {
-    "group": "Uniswap",
-    "slug": "uniswap/treasury-guard-hook",
-    "title": "A policy at the pool boundary.",
-    "lede": "TreasuryGuardHook restricts the configured input currency and raw-unit amount for exact-input swaps, with an owner-controlled pause.",
-    "source": "contracts/uniswap-v4/src/TreasuryGuardHook.sol",
-    "track": "Uniswap"
-  },
-  {
-    "group": "Uniswap",
-    "slug": "uniswap/salt-mining",
-    "title": "Deploy at a valid hook address.",
-    "lede": "Uniswap v4 encodes hook permissions in the deployment address. The deployment script mines a deterministic CREATE2 salt for the required flags.",
-    "source": "contracts/uniswap-v4/script/DeployHook.s.sol",
-    "track": "Uniswap"
+    "group": "Chainlink CCIP",
+    "slug": "ccip/token-bridge",
+    "title": "Cross-Chain Token Bridging with CCIP 2.0.",
+    "lede": "Bridge tokens across Ethereum Sepolia and Hedera Testnet via official CCIP Routers with 0-gas destination callbacks.",
+    "source": "packages/adapter-ccip/src/bridge.ts",
+    "track": "Chainlink CCIP"
   },
   {
     "group": "Hedera",

@@ -10,7 +10,6 @@ export function publicConfig() {
 		usdt: process.env.WHITECHAIN_USDT_ADDRESS || "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7",
 		merchant: process.env.PULSEPAY_MERCHANT_ADDRESS || "",
 		merchantName: process.env.PULSEPAY_MERCHANT_NAME || "Merchant console",
-		hook: process.env.UNISWAP_TREASURY_HOOK_ADDRESS || "",
 		topic: process.env.HEDERA_AUDIT_TOPIC_ID || "",
 		network: process.env.HEDERA_NETWORK === "mainnet" ? "mainnet" : "testnet",
 		serviceUrl: process.env.PULSEPAY_SERVICE_URL || process.env.PULSEPAY_APP_URL || "http://localhost:3000",

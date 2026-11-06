@@ -55,7 +55,6 @@ The repo’s default USDT address is `0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7
 
 ## Boundaries and tested status
 
-Whitechain handles customer/merchant USDT billing. Hedera handles native HBAR agent payments and HCS audit records. Uniswap supplies separate quote and treasury-hook functionality; the project does not currently bridge a swap into Whitechain invoice settlement.
 
 The live console test created and paid a 0.01 USDT invoice, verified its receipt, funded reserve, issued partial and full refunds, withdrew available proceeds, cancelled another invoice, created a plan, charged a due renewal, and cancelled the test subscriptions. Those were real testnet transactions, with a small server-side test-wallet bridge driving the actual UI. The private key stayed outside the browser.
 

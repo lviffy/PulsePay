@@ -16,7 +16,7 @@
     "@pulsepay/sdk-core": "workspace:*",
     "@pulsepay/sdk-server": "workspace:*",
     "@pulsepay/adapter-whitechain": "workspace:*",
-    "@pulsepay/adapter-uniswap": "workspace:*",
+    "@pulsepay/adapter-ccip": "workspace:*",
     "@pulsepay/adapter-hedera": "workspace:*",
     "viem": "^2.23.0"
   },

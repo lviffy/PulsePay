@@ -84,16 +84,13 @@ async function main() {
       rpcUrl: WHITECHAIN_RPC,
       walletClient,
     },
-    uniswap: {
-      routing: {
-        chainId: 1874,
-        rpcUrl: WHITECHAIN_RPC,
-        apiKey: process.env.UNISWAP_API_KEY,
-      },
+    ccip: {
+      chainId: 11155111,
+      rpcUrl: process.env.CCIP_RPC_URL || process.env.SEPOLIA_RPC_URL,
     },
   });
 
-  console.log("\n[OK] PulsePayClient initialized successfully with Whitechain & Uniswap adapters!");
+  console.log("\n[OK] PulsePayClient initialized successfully with Whitechain & Chainlink CCIP 2.0 adapters!");
 
   // ==========================================================================
   // Step 2: Track 1 - Whitechain On-Chain State & Invoices
@@ -166,49 +163,50 @@ async function main() {
   }
 
   // ==========================================================================
-  // Step 3: Track 2 - Uniswap Real-Time Routing & Universal Router
+  // Step 3: Track 2 - Chainlink CCIP 2.0 Token Bridging
   // ==========================================================================
-  header("STEP 3: Uniswap Track — Live DEX Quote & Router Calldata");
-  console.log("Demonstrating 'Pay With Any Token' Universal Checkout:");
-  console.log("- Buyer pays with:  WETH");
-  console.log("- Merchant expects: 25.00 USDT");
-  console.log("- Querying live price feeds (Uniswap Trading API v2 / DefiLlama DEX aggregator)...");
+  header("STEP 3: Chainlink CCIP 2.0 Track — Cross-Chain Token Bridging");
+  console.log("Demonstrating Cross-Chain Token Bridging via Chainlink CCIP:");
+  console.log("- Source Network:       Ethereum Sepolia (Chain ID: 11155111)");
+  console.log("- Destination Network:  Hedera Testnet (CCIP Selector: 222782988166878823)");
+  console.log("- Token to Bridge:      Configured source-chain ERC-20 (10,000,000 raw units)");
+  console.log(`- Recipient Wallet:     ${signerAddress}`);
 
   try {
-    const quote = await pulsepay.checkout.quotePayWithToken({
-      tokenInAddress: "0x7b79995e5f793a07bc00c21412e50ecae098e7f9", // WETH
-      tokenInSymbol: "WETH",
-      tokenInDecimals: 18,
-      tokenOutAddress: WHITECHAIN_USDT,
-      targetUsdtAmountUnits: 25_000_000n, // 25 USDT
-      slippageTolerancePercent: 0.5,
+    if (!process.env.CCIP_TOKEN_ADDRESS) throw new Error("Set CCIP_TOKEN_ADDRESS to a supported source-chain token; Whitechain USDT cannot be assumed bridgeable");
+    const quote = await pulsepay.bridgeOps.quoteFee({
+      destinationChainSelector: 222782988166878823n, // Hedera testnet selector
+      tokenAddress: process.env.CCIP_TOKEN_ADDRESS as `0x${string}`,
+      amountUnits: 10_000_000n, // 10 units
+      recipientAddress: signerAddress,
+    });
+
+    console.log(`\n[SUCCESS] Live Chainlink CCIP Bridge Fee Quote Received:`);
+    console.log(`- Source Chain:         ${quote.sourceChainId}`);
+    console.log(`- Destination Selector: ${quote.destinationChainSelector}`);
+    console.log(`- Required CCIP Fee:    ${formatEther(BigInt(quote.feeUnits))} Native Gas (${quote.feeUnits} wei)`);
+    console.log(`- Gas Limit:            0 (Token-only transfer, zero callback execution overhead)`);
+
+    subheader("Building CCIP Router Transaction Calldata");
+    const bridgeTxs = await pulsepay.bridgeOps.buildTransactions({
+      destinationChainSelector: 222782988166878823n,
+      tokenAddress: process.env.CCIP_TOKEN_ADDRESS as `0x${string}`,
+      amountUnits: 10_000_000n,
+      recipientAddress: signerAddress,
       payerAddress: signerAddress,
     });
 
-    console.log(`\n[SUCCESS] Live DEX Market Quote Received:`);
-    console.log(`- Required Input:      ${formatEther(BigInt(quote.inputAmount))} ${quote.inputToken}`);
-    console.log(`- Target Output:       ${formatUnits(BigInt(quote.outputAmount), 6)} ${quote.outputToken}`);
-    console.log(`- Slippage Tolerance:  ${quote.slippageTolerance}%`);
-    console.log(`- Execution Route:     ${quote.route}`);
-
-    subheader("Building Universal Router Transaction Calldata");
-    const swapTx = await pulsepay.routing.buildSwapTransaction({
-      routerAddress: "0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD", // Universal Router
-      tokenInAddress: "0x7b79995e5f793a07bc00c21412e50ecae098e7f9",
-      tokenInSymbol: "WETH",
-      tokenInDecimals: 18,
-      tokenOutAddress: WHITECHAIN_USDT,
-      targetUsdtAmountUnits: 25_000_000n,
-      payerAddress: signerAddress,
-      recipient: signerAddress,
-    });
-
-    console.log(`- Router Target:   ${swapTx.to}`);
-    console.log(`- Value to Send:   ${formatEther(swapTx.value)} ETH`);
-    console.log(`- Command Payload: ${swapTx.data.substring(0, 66)}... (${swapTx.data.length / 2} bytes)`);
-    console.log(`[OK] Calldata ready for direct Web3 wallet broadcast or Universal Router contract.`);
+    console.log(`- Router Target:        ${bridgeTxs.to}`);
+    console.log(`- Native Value to Send: ${formatEther(bridgeTxs.value)} ETH`);
+    console.log(`- ccipSend Payload:     ${bridgeTxs.data.substring(0, 66)}... (${bridgeTxs.data.length / 2} bytes)`);
+    if (bridgeTxs.approvalTx) {
+      console.log(`- Token Approval Target:${bridgeTxs.approvalTx.to}`);
+      console.log(`- Approval Payload:     ${bridgeTxs.approvalTx.data.substring(0, 66)}...`);
+    }
+    console.log("After wallet submission, track the actual message ID with bridgeOps.waitForDelivery(messageId).");
+    console.log(`[OK] Transactions ready for direct Web3 wallet broadcast to CCIP Router.`);
   } catch (err: any) {
-    console.log(`Uniswap quote error: ${err.message}`);
+    console.log(`CCIP bridge error: ${err.message}`);
   }
 
   // ==========================================================================
@@ -255,7 +253,7 @@ async function main() {
   header("DEMONSTRATION COMPLETE");
   console.log(`All three tracks tested and verified using the PulsePay SDK:
 1. Whitechain Sepolia:  Real contract state, live invoice generation & Blockscout link.
-2. Uniswap Routing:     Real-time DEX quote & Universal Router execution calldata.
+2. Chainlink CCIP 2.0:  Cross-chain token bridging quote & Router execution calldata.
 3. Hedera Micropay:     x402 protocol challenge negotiation & HCS audit architecture.
 
 To run the visual interactive web dashboard:

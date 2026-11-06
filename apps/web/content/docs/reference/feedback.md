@@ -25,7 +25,7 @@ Report the exact route and action, expected behavior, chain ID and a public tran
 | `README.md` | Current setup and API behavior |
 | `docs/HEDERA.md` | Native payment protocol and historical live evidence |
 | `WHITECHAIN_FEEDBACK.md` | Whitechain integration findings |
-| `FEEDBACK.md` | Uniswap integration findings |
+| `FEEDBACK.md` | Chainlink CCIP integration findings |
 
 Source: [docs/VERIFICATION.md](https://github.com/lviffy/ETHGLOBAL/blob/main/docs/VERIFICATION.md).
 

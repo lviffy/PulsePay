@@ -87,11 +87,9 @@ Result: local contracts and TypeScript builds pass, but the application payment 
 | TypeScript | PASS | All 7 packages and both apps compile with the installed `tsc`, in dependency order. |
 | Root build | BLOCKED | `bun run build` reaches Turbo but fails because the configured pnpm binary is unavailable. |
 | Whitechain contracts | PASS | 17 tests; both fuzz tests ran 256 cases each. Solidity 0.8.26, Forge 1.7.1. |
-| Uniswap contracts | PASS | 9 tests. Compiler reports only a suggestion to mark `beforeSwap` as `view`. |
 | Hedera existing suite | PASS | All 6 cases in `node packages/adapter-hedera/test/hedera.test.mjs`; policy, local audit formatting and plugin registration only. |
 | Hedera SDK transaction construction | PASS | Payment core action builds a two-account HBAR transfer without submitting it. |
 | Whitechain SDK encoding | PASS | All 11 transaction helpers decode to the expected ABI function names. No live RPC or wallet execution. |
-| Uniswap treasury adapter | PASS | Two admin encoders and policy aggregation with mocked contract reads. |
 | Demo HTTP routes | PASS | `/`, `/merchant`, `/receipt/inv_acme_pro_001`, `/api/export.csv`, `/.well-known/x402.json` return 200. CSV contains header plus 3 fixture rows; discovery price is 50,000,000 tinybars. |
 | x402 challenge | PASS | POST without payment header returns 402 and a 0.5 HBAR challenge. |
 | x402 payment verification | FAIL | Arbitrary nonempty payment headers grant access; repeated forged requests both return 200. |
@@ -113,7 +111,6 @@ The MCP error was: `MCP tool call requires approval, but approval policy is neve
 
 6. **HCS failures do not affect the result** — a deliberately invalid client causes the audit hook to log a warning and resolve successfully. No durable audit acknowledgment is returned. Missing topic/client similarly produces only a local log. Report audit status separately and make failed records recoverable.
 
-7. **Uniswap quotes are always estimated** — `UniswapRoutingAdapter.getExactOutputQuote` makes zero HTTP requests even with an API key configured; the base URL and constructed headers are unused. A stubbed `fetch` that throws was never invoked. Live routing and swap execution remain unimplemented in this path.
 
 8. **Customer and merchant UI actions are simulated** — the storefront uses a timer for successful checkout; the React checkout generates a random hash. Receipts, ledger activity and merchant balances use fixture data. Rendering those pages does not verify payments, refunds, balances or swaps.
 
@@ -121,7 +118,6 @@ The MCP error was: `MCP tool call requires approval, but approval policy is neve
 
 ## Reproduction commands
 
-Compile packages in this order using `../../node_modules/.bin/tsc` from each package directory: `shared`, `adapter-hedera`, `adapter-whitechain`, `adapter-uniswap`, `sdk-server`, `sdk-core`, `sdk-react`. Then compile both apps in the same way.
 
 ```bash
 node packages/adapter-hedera/test/hedera.test.mjs
@@ -138,5 +134,3 @@ bunx --package @foundry-rs/forge forge test --use 0.8.26
 The explicit compiler version avoids the missing project-local `.bin/solc`. Default package scripts also reference a missing `.bin/forge`.
 
 ## Limits
-
-No application source was changed. Existing edits to root `package.json` and the untracked `bun.lock` predated verification. Builds and contract runs generated ignored output/cache files. Foundry was obtained through bunx. Browser rendering and interactive wallet behavior were not exercised; UI simulation findings are from source inspection. No deployed Whitechain/Uniswap contracts or real Trading API were queried, and Hedera MCP access remains blocked by session policy.

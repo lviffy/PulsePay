@@ -1,6 +1,6 @@
 ## 01 / Overview
 
-createPulsePay constructs Whitechain, quote routing and optional treasury adapters and exposes their real methods through typed groups.
+createPulsePay constructs Whitechain and CCIP bridge adapters and exposes their real methods through typed groups.
 
 This page follows the implementation in `packages/sdk-core/src/index.ts`. The source explorer on the landing page exposes the workspace files used by the site.
 
@@ -24,7 +24,7 @@ Published as [`@pulsepay/sdk-core` on npm](https://www.npmjs.com/package/@pulsep
 
 ## 03 / Walkthrough
 
-Configure whitechain.contractAddress and an optional rpcUrl, usdtAddress or publicClient. Supply walletClient only for wallet-authorized writes. Configure uniswap.routing for server-side quotes and uniswap.treasury for the deployed hook. Invalid hub addresses are rejected before a request is sent.
+Configure whitechain.contractAddress and an optional rpcUrl, usdtAddress or publicClient. Supply walletClient only for wallet-authorized writes. Configure ccip for cross-chain token bridging. Invalid hub addresses are rejected before a request is sent.
 
 Amounts use bigint in base units. The web API serializes these values as integer strings. Reconstruct bigint before calling writes; never use floating point to calculate a refund or invoice amount.
 

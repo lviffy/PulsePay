@@ -10,7 +10,6 @@ The user subsequently requested fixes. The original findings below are retained 
 | --- | --- |
 | 1. Merchant authentication | Timing-safe API-key validation, expiring signed HttpOnly sessions, merchant login, same-origin restrictions, rate limits and secret redaction. |
 | 2. Simulated settlement | Direct React USDT checkout now submits through a configured wallet and verifies a matching settlement event. EVM preview mutations require explicit demo mode, return `simulated: true`, and never enter verified CSV exports. The storefront cannot report timer-only payment success. |
-| 3. Uniswap estimates | Real exact-output HTTP quote requests, strict input/response validation and fail-closed missing-key/API-error behavior. Whitechain cross-chain settlement remains explicitly unsupported. Quotes do not broadcast swaps. |
 | 4. Amount corruption | Positive bounded six-decimal monetary inputs, integer-unit arithmetic for swaps/refunds, refundable-status/reserve checks and restricted asset choices. |
 | 5. Treasury limits | Each deployment binds its raw-unit limit to one ERC-20 input currency. Exact-output and other-input-currency swaps are rejected. Four new integration cases exercise a real local PoolManager, including a six-decimal token. A new deployment is required for existing pools. |
 | 6. Dependency graph | pnpm is authoritative, its lockfile matches manifests, the stale Bun lockfile was removed, and vulnerable Zod/WebSocket/minimatch resolutions were updated. Full audit reports no known vulnerabilities. |
@@ -29,7 +28,6 @@ The explicitly disabled EVM preview admin actions have not been replaced with a 
 
 Verdict: the installed workspace builds and its existing tests pass, but the application is not fully configured for real payment operation or public deployment. Several advertised flows remain simulations, and merchant HTTP routes lack authentication and input validation.
 
-This was an audit only. No application code or secrets were changed. The existing edit to `contracts/uniswap-v4/script/DeployHook.s.sol` was preserved. No blockchain transactions, live agent purchases, or deployments were executed. Local HTTP probes used a temporary working directory, a dummy merchant account and no signing keys.
 
 ## Validation results
 
@@ -38,7 +36,6 @@ This was an audit only. No application code or secrets were changed. The existin
 | Root TypeScript build | PASS | All seven packages and both applications; installed dependency graph. |
 | JavaScript regression tests | PASS | 20 Hedera adapter tests and six server tests. |
 | Whitechain contracts | PASS | 17 tests, including two fuzz tests at 256 runs each. |
-| Uniswap contracts | PASS | Nine tests; callbacks use a mocked PoolManager. |
 | Lint | INEFFECTIVE | Root command succeeds with zero tasks; no workspace has a lint script. |
 | Unpaid / forged payment HTTP checks | PASS | Unpaid request returns 402; `not-a-payment` returns 400. |
 | Merchant authorization | FAIL | Unauthenticated state reads and hook configuration changes return 200. |
@@ -66,14 +63,6 @@ The React checkout waits 1.5 seconds, generates a random hash, sets `CONFIRMED` 
 
 Fix: connect invoice reads, wallet transactions and independently verified receipts. Until implemented, explicitly identify these actions and receipts as simulations and keep them out of real accounting exports.
 
-### 3. High — Configuring the Uniswap API key never enables real routing
-
-Reference: `packages/adapter-uniswap/src/routing.ts:30`.
-
-The quote function constructs headers but never calls `fetch` or uses its base URL. It computes fixed benchmark pricing even with an API key. Token addresses and payer do not influence a real route. A probe with a configured dummy key returned a quote with exactly zero HTTP requests.
-
-Fix: implement and validate real quotes and executable swap transactions, including supported chain/token pairs. The Whitechain invoice and Unichain treasury cannot be treated as a single-chain settlement path without an explicit cross-chain design.
-
 ### 4. High — Monetary input validation permits accounting corruption
 
 References: `apps/demo-store/src/index.ts:393`, `:439`, `:525`, `:543`.
@@ -88,7 +77,6 @@ Refunds also lack a paid-status requirement. Fix: validate request schemas befor
 
 ### 5. High — Treasury input limits do not enforce the stated policy for exact-output swaps
 
-References: `contracts/uniswap-v4/src/TreasuryGuardHook.sol:101`; `contracts/uniswap-v4/script/DeployHook.s.sol:14`; vendored `v4-core/src/types/PoolOperation.sol:22`.
 
 The hook compares the absolute `amountSpecified` with an input-token limit. In v4, positive `amountSpecified` specifies output. An exact-output trade can therefore consume input above the advertised input limit while passing this comparison. The callback ignores the pool currencies and applies one raw-unit limit across assets. The deployment limit assumes 18 decimals, while shared USDT constants assume six; it cannot represent the UI's stated USDT ceiling consistently.
 
@@ -116,7 +104,6 @@ Fix: render untrusted text through text nodes or escape it for its exact HTML co
 
 References: `.env.example:8`; `apps/demo-store/src/index.ts:15`, `:292`, `:304`; `README.md:167`; `docs/HEDERA.md`.
 
-Most EVM environment variables have no application consumer. In particular, setting deployment addresses, router addresses and the Uniswap API key does not wire them into the demo. `DATABASE_URL` is unused. `PULSEPAY_API_URL` defaults to port 3001, but the application serves APIs on its single `PORT` (3000). The server hardcodes both Hedera services to testnet while the buyer honors `HEDERA_NETWORK`, so mainnet configuration cannot work end to end.
 
 The local `.env` has populated settings, but its API secret still has the example placeholder. Its presence does not establish that keys match accounts or contracts exist. No secret values were printed. The main README's Node launch commands do not load `.env`; the corrected `node --env-file=.env ...` commands already exist in `docs/HEDERA.md`.
 
@@ -148,7 +135,6 @@ Fix: persist the purchased result or an authenticated retrieval capability and r
 
 ### 12. Medium — Five package module entries point to missing build files
 
-References: `packages/sdk-react/package.json:6` and the corresponding manifests for shared, sdk-core, adapter-whitechain and adapter-uniswap.
 
 These packages advertise `dist/index.mjs`, but `tsc` emits `dist/index.js`. All five `.mjs` targets were absent after a successful build. Consumers honoring the `module` field can fail or select an unintended fallback.
 
@@ -166,7 +152,6 @@ Fix: use a pinned compiler version with standard Foundry commands, or document a
 
 1. Protect merchant endpoints, stop secret disclosure, validate monetary inputs and escape HTML.
 2. Make simulated payment behavior explicit; connect real settlement and receipt verification before claiming success.
-3. Correct treasury limit semantics and implement real Uniswap routing.
 4. Align package manager, lockfile, package exports, environment loading and Foundry setup.
 5. Add effective lint/CI and integration tests; harden payment state and response recovery.
 

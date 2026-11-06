@@ -7,7 +7,7 @@ import { merchantAuth, equalSecret, RequestLimits } from "./security.js";
 import { acquireStateOwner, hederaMerchantHubAbi, hederaTestnet } from "@pulsepay/adapter-hedera";
 import { handleX402PaymentCheck, generateX402Manifest, getVerifiedHederaPayments, handleEvmInvoicePaymentCheck, generateEvmInvoiceManifest, getVerifiedEvmInvoicePayments, formatAccountantCsv } from "@pulsepay/sdk-server";
 import type { NormalizedActivity } from "@pulsepay/shared";
-import { UniswapRoutingAdapter } from "@pulsepay/adapter-uniswap";
+import { CCIPBridgeAdapter } from "@pulsepay/adapter-ccip";
 import { createPublicClient, createWalletClient, http as evmHttp, isAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -21,14 +21,13 @@ const paymentStatePath = join(config.stateDirectory, "challenges.json");
 const evmInvoiceStatePath = join(config.stateDirectory, "evm-invoice-challenges.json");
 const verifiedPayments = () => getVerifiedHederaPayments(paymentStatePath);
 const verifiedEvmPayments = () => getVerifiedEvmInvoicePayments(evmInvoiceStatePath);
-const routing = new UniswapRoutingAdapter({ apiKey: process.env.UNISWAP_API_KEY, chainId: Number(process.env.UNISWAP_CHAIN_ID || "1301") });
+const bridge = new CCIPBridgeAdapter({ rpcUrl: process.env.CCIP_RPC_URL || process.env.SEPOLIA_RPC_URL, chainId: Number(process.env.CCIP_SOURCE_CHAIN_ID || "11155111") });
 const evm = process.env.WHITECHAIN_MERCHANT_HUB_ADDRESS ? createPulsePay({
   whitechain: { contractAddress: process.env.WHITECHAIN_MERCHANT_HUB_ADDRESS as `0x${string}`, rpcUrl: process.env.WHITECHAIN_RPC_URL, usdtAddress: process.env.WHITECHAIN_USDT_ADDRESS as `0x${string}` | undefined },
-  uniswap: { routing: { apiKey: process.env.UNISWAP_API_KEY, chainId: Number(process.env.UNISWAP_CHAIN_ID || "1301") },
-    ...(process.env.UNISWAP_TREASURY_HOOK_ADDRESS ? { treasury: { hookAddress: process.env.UNISWAP_TREASURY_HOOK_ADDRESS as `0x${string}`, rpcUrl: process.env.UNISWAP_RPC_URL, poolManagerAddress: process.env.UNISWAP_POOL_MANAGER as `0x${string}` | undefined } } : {}) },
+  ccip: { rpcUrl: process.env.CCIP_RPC_URL || process.env.SEPOLIA_RPC_URL, chainId: Number(process.env.CCIP_SOURCE_CHAIN_ID || "11155111") },
 }) : undefined;
 const webOrigin = new URL(process.env.PULSEPAY_WEB_URL || "http://localhost:3100").origin;
-const removedRoutes = new Set(["/api/invoices/create", "/api/invoices/refund", "/api/treasury/hook-config", "/api/treasury/swap", "/api/treasury/claim-fees", "/api/subscriptions/renew", "/api/reserves/withdraw", "/api/webhooks/test"]);
+const removedRoutes = new Set(["/api/invoices/create", "/api/invoices/refund", "/api/treasury/hook-config", "/api/treasury/policy", "/api/treasury/swap", "/api/treasury/claim-fees", "/api/subscriptions/renew", "/api/reserves/withdraw", "/api/webhooks/test"]);
 
 const acmeServices = [
   {
@@ -166,15 +165,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     const invoice = await evm.invoices.get(id as `0x${string}`);
     respond(invoice ? 200 : 404, invoice || { error: "Invoice not found" }); return;
   }
-  if (pathname === "/api/treasury/policy" && req.method === "GET") {
-    if (!evm?.treasury) { respond(503, { error: "Configure a deployed UNISWAP_TREASURY_HOOK_ADDRESS and Whitechain hub" }); return; }
-    respond(200, await evm.treasury.getHookPolicy()); return;
-  }
-  if (pathname === "/api/uniswap/quote" && req.method === "POST") {
+  if (pathname === "/api/bridge/quote" && req.method === "POST") {
     try {
       const data = await parseJsonBody<any>(req);
-      if (typeof data.targetUsdtAmountUnits !== "string" || !/^[0-9]{1,78}$/.test(data.targetUsdtAmountUnits)) throw new Error("Use positive integer output token units");
-      const quote = await routing.getExactOutputQuote({ ...data, targetUsdtAmountUnits: BigInt(data.targetUsdtAmountUnits) });
+      if (typeof data.amountUnits !== "string" || !/^[0-9]{1,78}$/.test(data.amountUnits)) throw new Error("Use positive integer token units");
+      const quote = await bridge.quoteBridgeFee({ ...data, amountUnits: BigInt(data.amountUnits), ...(data.destinationChainSelector !== undefined ? { destinationChainSelector: BigInt(data.destinationChainSelector) } : {}) });
       respond(200, quote);
     } catch (error: any) { respond(400, { error: error.message }); }
     return;

@@ -54,12 +54,9 @@ const pulsepay = createPulsePay({
     rpcUrl: WHITECHAIN_RPC,
     walletClient,
   },
-  uniswap: {
-    routing: {
-      chainId: 1874,
-      rpcUrl: WHITECHAIN_RPC,
-      apiKey: process.env.UNISWAP_API_KEY,
-    },
+  ccip: {
+    chainId: 11155111,
+    rpcUrl: process.env.CCIP_RPC_URL || process.env.SEPOLIA_RPC_URL,
   },
 });
 
@@ -116,9 +113,9 @@ const server = http.createServer(async (req, res) => {
         merchantAddress,
         explorerUrl: `${EXPLORER_URL}/address/${WHITECHAIN_HUB}`,
       },
-      uniswap: {
-        network: "Unichain Sepolia / Whitechain",
-        router: "0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD",
+      ccip: {
+        network: "Ethereum Sepolia -> Hedera Testnet",
+        router: "0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59",
       },
       hedera: {
         network: "hedera:testnet",
@@ -196,23 +193,16 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (url.pathname === "/api/uniswap/quote" && req.method === "POST") {
+  if (url.pathname === "/api/ccip/quote" && req.method === "POST") {
     try {
       const body = await parseBody(req);
-      const tokenIn = body.tokenIn || "WETH";
-      const targetUsdt = BigInt(body.amountUsdt || 25) * 1_000_000n;
-
-      const quote = await pulsepay.checkout.quotePayWithToken({
-        tokenInAddress:
-          tokenIn === "WETH"
-            ? "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
-            : "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238",
-        tokenInSymbol: tokenIn,
-        tokenInDecimals: tokenIn === "WETH" ? 18 : 6,
-        tokenOutAddress: WHITECHAIN_USDT,
-        targetUsdtAmountUnits: targetUsdt,
-        payerAddress: merchantAddress,
-        slippageTolerancePercent: 0.5,
+      if (!process.env.CCIP_TOKEN_ADDRESS) throw new Error("Set CCIP_TOKEN_ADDRESS to a supported source-chain token");
+      const targetUnits = BigInt(body.amountUnits || 10_000_000);
+      const quote = await pulsepay.bridgeOps.quoteFee({
+        destinationChainSelector: 222782988166878823n, // Hedera testnet selector
+        tokenAddress: process.env.CCIP_TOKEN_ADDRESS as `0x${string}`,
+        amountUnits: targetUnits,
+        recipientAddress: merchantAddress,
       });
 
       return sendJson(res, 200, quote);
@@ -221,28 +211,26 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (url.pathname === "/api/uniswap/build-swap" && req.method === "POST") {
+  if (url.pathname === "/api/ccip/build-bridge" && req.method === "POST") {
     try {
       const body = await parseBody(req);
-      const maxInputUnits = BigInt(body.maxInputUnits || 10000000000000000n);
-      const swapTx = await pulsepay.routing.buildSwapTransaction({
-        routerAddress: "0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD",
-        tokenInAddress: "0x7b79995e5f793a07bc00c21412e50ecae098e7f9",
-        tokenInSymbol: "WETH",
-        tokenInDecimals: 18,
-        tokenOutAddress: WHITECHAIN_USDT,
-        targetUsdtAmountUnits: 25_000_000n,
-        maxInputAmountUnits: maxInputUnits,
+      if (!process.env.CCIP_TOKEN_ADDRESS) throw new Error("Set CCIP_TOKEN_ADDRESS to a supported source-chain token");
+      const targetUnits = BigInt(body.amountUnits || 10_000_000);
+      const bridgeTxs = await pulsepay.bridgeOps.buildTransactions({
+        destinationChainSelector: 222782988166878823n,
+        tokenAddress: process.env.CCIP_TOKEN_ADDRESS as `0x${string}`,
+        amountUnits: targetUnits,
+        recipientAddress: merchantAddress,
         payerAddress: merchantAddress,
-        recipient: merchantAddress,
-        deadlineSeconds: 1200,
       });
 
       return sendJson(res, 200, {
-        to: swapTx.to,
-        valueWei: swapTx.value.toString(),
-        calldata: swapTx.data,
-        calldataBytes: swapTx.data.length / 2,
+        routerTarget: bridgeTxs.to,
+        nativeFeeWei: bridgeTxs.value.toString(),
+        calldata: bridgeTxs.data,
+        calldataBytes: bridgeTxs.data.length / 2,
+        approvalTx: bridgeTxs.approvalTx ? { ...bridgeTxs.approvalTx, value: "0" } : undefined,
+        monitoring: "After wallet submission, use the actual bytes32 message ID with bridgeOps.getStatus or waitForDelivery.",
       });
     } catch (err: any) {
       return sendJson(res, 500, { error: err.message });
@@ -315,7 +303,7 @@ const server = http.createServer(async (req, res) => {
   <div class="header">
     <div>
       <div class="logo">⚡ PulsePay SDK Live Demonstration</div>
-      <div style="color: var(--muted); font-size: 14px; margin-top: 4px;">Universal on-chain settlement across Whitechain, Uniswap, and Hedera</div>
+      <div style="color: var(--muted); font-size: 14px; margin-top: 4px;">Universal on-chain settlement across Whitechain, Chainlink CCIP 2.0, and Hedera</div>
     </div>
     <div class="badge">● Live Testnets Connected</div>
   </div>
@@ -333,16 +321,16 @@ const server = http.createServer(async (req, res) => {
       <div id="whitechain-out" class="output">// Click a button above to execute live contract call...</div>
     </div>
 
-    <!-- Card 2: Uniswap Routing -->
+    <!-- Card 2: Chainlink CCIP 2.0 Token Bridging -->
     <div class="card">
-      <h3>🦄 Uniswap v4 & Routing</h3>
-      <p class="desc">Live multi-tier DEX quote engine and Universal Router calldata builder for zero-slippage 'Pay With Any Token' checkout.</p>
+      <h3>🔗 Chainlink CCIP 2.0</h3>
+      <p class="desc">Cross-chain token bridging via official CCIP Routers with 0-gas destination callbacks directly to recipient wallets.</p>
       <div style="display: flex; flex-direction: column; gap: 8px;">
-        <button class="btn btn-purple" onclick="getQuote()">Get Live DEX Quote (WETH)</button>
-        <button class="btn" onclick="buildSwap()">Build Universal Router Calldata</button>
+        <button class="btn btn-purple" onclick="getQuote()">Get CCIP Bridge Fee Quote</button>
+        <button class="btn" onclick="buildBridge()">Build CCIP Router Calldata</button>
       </div>
-      <a class="link" href="https://sepolia.unichain.org" target="_blank">↗ Unichain Sepolia Explorer</a>
-      <div id="uniswap-out" class="output">// Click a button to query live market quote...</div>
+      <a class="link" href="https://ccip.chain.link" target="_blank">↗ Chainlink CCIP Explorer</a>
+      <div id="ccip-out" class="output">// Click a button to quote cross-chain bridge fee...</div>
     </div>
 
     <!-- Card 3: Hedera x402 -->
@@ -393,13 +381,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     async function getQuote() {
-      const out = document.getElementById('uniswap-out');
-      out.textContent = "Querying live DEX rates for 25 USDT...";
+      const out = document.getElementById('ccip-out');
+      out.textContent = "Querying live CCIP bridge fee from Sepolia -> Hedera...";
       try {
-        const res = await fetch('/api/uniswap/quote', {
+        const res = await fetch('/api/ccip/quote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tokenIn: 'WETH', amountUsdt: 25 })
+          body: JSON.stringify({ amountUnits: '10000000' })
         });
         const data = await res.json();
         out.textContent = JSON.stringify(data, null, 2);
@@ -408,14 +396,14 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    async function buildSwap() {
-      const out = document.getElementById('uniswap-out');
-      out.textContent = "Building Universal Router command 0x01 (V3_SWAP_EXACT_OUT)...";
+    async function buildBridge() {
+      const out = document.getElementById('ccip-out');
+      out.textContent = "Building CCIP ccipSend() router calldata with gasLimit = 0...";
       try {
-        const res = await fetch('/api/uniswap/build-swap', {
+        const res = await fetch('/api/ccip/build-bridge', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
+          body: JSON.stringify({ amountUnits: '10000000' })
         });
         const data = await res.json();
         out.textContent = JSON.stringify(data, null, 2);

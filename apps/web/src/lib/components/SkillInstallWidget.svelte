@@ -20,7 +20,7 @@
 			label: 'Claude Code',
 			command: 'npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a claude-code',
 			targetDir: '.claude/skills/pulsepay/SKILL.md',
-			note: 'Native Claude Code skill. Trigger with /pulsepay or ask Claude to handle Whitechain, Uniswap, or Hedera payments.'
+			note: 'Native Claude Code skill. Trigger with /pulsepay or ask Claude to handle Whitechain, Chainlink CCIP, or Hedera payments.'
 		},
 		{
 			id: 'cursor',

@@ -22,8 +22,6 @@ Set the root `.env` using `.env.example`. The frontend requires no signing keys.
 | `PULSEPAY_MERCHANT_ADDRESS` | Initial merchant read address; may be selected in Settings |
 | `PULSEPAY_MERCHANT_NAME` | Merchant console title |
 | `PULSEPAY_WEB_URL` | Canonical web origin for social metadata |
-| `UNISWAP_TREASURY_HOOK_ADDRESS` | Deployed treasury guard on Unichain Sepolia |
-| `UNISWAP_RPC_URL` | Treasury policy RPC |
 | `HEDERA_AUDIT_TOPIC_ID` | Actual worker topic displayed in the Hedera tab |
 | `HEDERA_NETWORK` | `testnet` or `mainnet` |
 | `PULSEPAY_SERVICE_URL` | Existing paid API origin; defaults to port 3000 |

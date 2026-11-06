@@ -56,13 +56,13 @@
 			npmUrl: 'https://www.npmjs.com/package/@pulsepay/adapter-hedera'
 		},
 		{
-			id: 'uniswap',
-			label: 'Uniswap Adapter',
-			pkg: '@pulsepay/adapter-uniswap',
-			npmCmd: 'npm install @pulsepay/adapter-uniswap viem',
+			id: 'ccip',
+			label: 'CCIP Adapter',
+			pkg: '@pulsepay/adapter-ccip',
+			npmCmd: 'npm install @pulsepay/adapter-ccip viem',
 			version: 'v1.0.0',
-			description: 'Trading API exact-output routing and Uniswap v4 treasury guard hook controls.',
-			npmUrl: 'https://www.npmjs.com/package/@pulsepay/adapter-uniswap'
+			description: 'Chainlink CCIP 2.0 cross-chain token bridging and Router transaction builders.',
+			npmUrl: 'https://www.npmjs.com/package/@pulsepay/adapter-ccip'
 		}
 	];
 

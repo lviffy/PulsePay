@@ -11,7 +11,6 @@ Checked against the current source on 2026-11-06. The frontend is **SvelteKit 3 
 | `/pricing-free` | A Svelte page calling the Whitechain SDK directly. Reads a real bytes32 invoice; browser-wallet USDT approval/payment is required. React applications can separately use `PulsePayCheckout`. |
 | `/receipt/[id]` | A Svelte receipt backed by `/api/receipt/[id]`, which reads invoice/payment state and requires a settlement transaction hash. Receipt artwork alone proves nothing. |
 | `/merchant/exports` | `/api/export` formats Whitechain settlement/refund events. Each request covers one 20,000-block window, split into 2,000-block RPC ranges. It is not an automatic export of all history. |
-| `/merchant/treasury` | Whitechain reserve funding/withdrawals plus live Unichain treasury-hook policy reads. Hook controls require its owner wallet. No browser swap/LP execution UI is supplied here. |
 | `/merchant/agents` | Reads HCS topic messages from the Hedera Mirror Node and discovery from the separate paid API. HCS message contents are not independently verified payment receipts. |
 | Homepage `/#protocol` | Links to the real merchant pages and the agent skill installer. The former x402, reserve-math and hook simulators are removed. |
 | Payment API on port 3000 | Authenticated quote/read/ledger endpoints and real Hedera payment-proof verification. Its paid resource content is explicitly sample content, not live financial market data. |
@@ -43,7 +42,6 @@ WHITECHAIN_DEPLOYMENT_BLOCK=<actual hub deployment block>
 
 The merchant address can instead be entered in Settings and is retained in browser local storage. Public reads require no private key.
 
-For the other read panels, set a real `UNISWAP_TREASURY_HOOK_ADDRESS` and `UNISWAP_RPC_URL`, and a real `HEDERA_AUDIT_TOPIC_ID` with `HEDERA_NETWORK=testnet`. For service discovery, set `PULSEPAY_SERVICE_URL=http://localhost:3000` and run the paid API separately:
 
 ```bash
 pnpm dev:api
@@ -71,7 +69,6 @@ Observed with the current unconfigured root `.env`:
 | `/api/merchant` | 503, select a merchant address |
 | `/api/export` | 503, a valid merchant address is required |
 | `/api/audit` | 503, configure `HEDERA_AUDIT_TOPIC_ID` |
-| `/api/treasury` | 503, configure `UNISWAP_TREASURY_HOOK_ADDRESS` |
 | `/api/receipt/not-an-id` | 400, invoice ID must be bytes32 |
 | `/api/receipt/0x` followed by 64 zeroes | 503, configure the merchant hub |
 | `/.well-known/x402.json` | 503, paid API unavailable |
@@ -83,7 +80,6 @@ An isolated preview was also started with the report’s hub/owner addresses and
 | Configured read | Observed result |
 | --- | --- |
 | Whitechain RPC `eth_chainId` | `0x752` (1874) |
-| Unichain Sepolia RPC `eth_chainId` | `0x515` (1301) |
 | `/api/merchant?merchant=0x6105F7D9807998014ca12bF1D67849de7B1094Ac` | 200; zero rows in blocks 12,344,489–12,364,488, zero held balances, merchant reserve policy 2000 bps |
 | `/api/audit` with topic `0.0.11330043` | 200; one actual topic message, sequence 1 |
 | `/api/export?merchant=...` | 200; header-only CSV for the empty current window |
@@ -122,7 +118,6 @@ Reserve policy is configurable. A read-only check of the hub cited in the previo
 
 - **Plans:** `/merchant/subscriptions` can create a plan and charge due subscriptions. Creating a plan does not create a subscriber. The frontend has no subscriber-enrollment screen; use the SDK's `client.subscriptions.subscribe(subscriptionId, planId, subscriberWallet)` or the deployed contract from the subscriber wallet. That pays the first cycle and requires token allowance. The SDK currently approves 12 cycles when initial allowance is insufficient; inspect that approval explicitly. Charge only an active, due subscription with adequate balance/allowance.
 - **Whitechain funds:** `/merchant/treasury` offers **Fund reserve** and **Withdraw available**. Funding may require an ERC-20 approval. Verify confirmed contract events and current balances.
-- **Uniswap:** the treasury panel reads `paused`, `owner`, `limitCurrency` and `maxSwapAmount` from a configured Unichain Sepolia hook. Limits are raw input-token units, not a universal $5,000 threshold. Pause/limit changes require the hook owner's wallet on chain 1301. Reading policy does not execute a swap. The removed homepage button never called the hook.
 - **CSV:** use `/merchant/exports` with Whitechain selected. Verify transaction hashes, UTC timestamps, raw units and the displayed block window. Load/select older windows separately; this is not a lifetime ledger. The Hedera audit download contains topic messages and must not be confused with the API's verified-payment CSV at `/api/export.csv`.
 
 ## 7. Hedera discovery and audit checks
@@ -154,7 +149,6 @@ Results from this run:
 | Web typecheck | PASS |
 | Launcher tests | PASS, 3 tests |
 | `pnpm test:unit` | PASS, 44 tests across 5 test tasks; includes 2 updated HTTP regression tests |
-| `pnpm test:contracts` | NOT RUN: command stopped because Foundry (`forge`) is not installed. The Uniswap unit suite did separately compile the hook and its test source with solc; that is not a substitute for running Foundry tests. |
 | Browser captures | PASS, desktop 1440×900 and phone 390×844 homepage; no captured browser exceptions. Configured checkout displayed the actual 25 USDT invoice without submitting payment. |
 | HTTP page smoke checks | PASS, homepage, all 8 merchant sections, checkout, invalid receipt page and relevant docs render; removed dashboard source returns 404 and its SDK export is absent |
 | New signed network transactions | NOT RUN; no payment, refund, subscription, hook write or HCS submission was broadcast |
@@ -167,6 +161,5 @@ For browser checks, inspect the homepage, all merchant sections, checkout and an
 
 - [Whitechain's current Sepolia setup](https://whitechain.io/blog/start-building-on-whitechain) — chain 1874, RPC, WBT gas and explorer.
 - [Hedera Mirror Node topics](https://docs.hedera.com/reference/rest-api/topics) — topic/message query endpoints.
-- [Uniswap v4 hooks](https://developers.uniswap.org/docs/protocols/v4/concepts/hooks) — hooks execute in the pool lifecycle; a local amount slider is not hook execution.
 - [Whitechain contract source](../contracts/whitechain/src/PulsePayMerchantHub.sol), [wallet checkout](../apps/web/src/routes/pricing-free/+page.svelte), [live read helpers](../apps/web/src/lib/chain.ts), and [SDK subscription implementation](../packages/adapter-whitechain/src/client.ts).
 - [Historical verification log](VERIFICATION.md) — earlier runs and transactions; historical entries do not establish the current configuration or this run's results.

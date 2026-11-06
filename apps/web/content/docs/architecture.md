@@ -24,7 +24,7 @@ One server and one worker may own their file-backed stores. Keep PULSEPAY_STATE_
 | Class or file | Responsibility |
 | --- | --- |
 | `WhitechainAdapter` | EVM invoice and billing operations |
-| `UniswapRoutingAdapter` | Exact-output quote client |
+| `CCIPBridgeAdapter` | Chainlink CCIP 2.0 token bridging client |
 | `PulsePayHederaPlugin` | Agent Kit tools with spend policy and audit hooks |
 
 Source: [README.md](https://github.com/lviffy/ETHGLOBAL/blob/main/README.md).

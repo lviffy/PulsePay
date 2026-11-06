@@ -2,16 +2,16 @@
 name: pulsepay
 description: >
   Integrate PulsePay payment rails, merchant invoicing, refund reserves, Hedera
-  x402 autonomous machine payments, and Uniswap V4 treasury guard hooks. Use
+  x402 autonomous machine payments, and Chainlink CCIP 2.0 token bridging. Use
   when the user asks to accept crypto payments, set up merchant checkout, invoice
-  customers in USDT on Whitechain, configure Uniswap V4 liquidity or treasury swap
-  guards, or enable AI agents to pay HTTP-402 pay-per-use endpoints with HBAR.
+  customers in USDT on Whitechain, bridge tokens across testnets with Chainlink CCIP,
+  or enable AI agents to pay HTTP-402 pay-per-use endpoints with HBAR.
 version: 1.0.0
 ---
 
 # PulsePay Integration Skill
 
-Unified merchant billing, treasury controls, and autonomous agent payments across Whitechain, Uniswap v4, and Hedera.
+Unified merchant billing, cross-chain token bridging, and autonomous agent payments across Whitechain, Chainlink CCIP 2.0, and Hedera.
 
 ## Quick Installation
 
@@ -48,8 +48,7 @@ npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a copilot
 Activate this skill when:
 - Creating or querying onchain invoices or recurring subscriptions on **Whitechain Sepolia** (Chain ID `1874`).
 - Integrating the `@pulsepay/sdk-react` drop-in checkout (`<PulsePayCheckout />`).
-- Protecting merchant swap liquidity using the **Uniswap v4** `TreasuryGuardHook`.
-- Quoting multi-token checkout via the Uniswap Universal Router ("Pay With Any Token").
+- Bridging tokens across Ethereum Sepolia and Hedera Testnet using **Chainlink CCIP 2.0** with zero destination callback gas.
 - Gating HTTP APIs behind autonomous AI agent payments with **Hedera x402** (`hedera-native-receipt`).
 - Enforcing spend limits (`PulsePaySpendLimitPolicy`) and recording audit trails to Hedera Consensus Service (`PulsePayHcsAuditHook`).
 
@@ -60,7 +59,7 @@ Activate this skill when:
 | Rail / Track | Network | Primary Contracts / Packages | Purpose |
 | :--- | :--- | :--- | :--- |
 | **Whitechain** | Sepolia (1874) | `PulsePayMerchantHub.sol`, `@pulsepay/adapter-whitechain` | USDT invoicing, payments, subscription consent, refund reserve pool |
-| **Uniswap v4** | Unichain Sepolia (1301) | `TreasuryGuardHook.sol`, `@pulsepay/adapter-uniswap` | Exact-output token routing, swap caps, paused states |
+| **Chainlink CCIP 2.0** | Testnets (11155111, 296) | `@pulsepay/adapter-ccip`, CCIP Routers | Cross-chain token bridging directly to destination wallets |
 | **Hedera x402** | Testnet / Mainnet | `@pulsepay/adapter-hedera`, `@pulsepay/sdk-server` | Machine payment protocol, HBAR asset `0.0.0`, HCS audit trail |
 | **React SDK** | Frontend | `@pulsepay/sdk-react`, `@pulsepay/sdk-core` | Drop-in `<PulsePayCheckout />` component with modal & inline modes |
 
@@ -181,21 +180,28 @@ tool.registerHook(policy);
 
 ---
 
-## 4. Uniswap v4 Treasury Guard Hook
+## 4. Chainlink CCIP 2.0 Token Bridging
 
 ```typescript
-import { UniswapV4TreasuryAdapter } from "@pulsepay/adapter-uniswap";
+import { CCIPBridgeAdapter } from "@pulsepay/adapter-ccip";
 
-const treasury = new UniswapV4TreasuryAdapter({
-  hookAddress: "0x00C0A5F1b837269D3E9d6092F0eF675fA5517178",
-  rpcUrl: "https://sepolia.unichain.org",
-  walletClient,
+const bridge = new CCIPBridgeAdapter();
+
+// 1. Get real-time CCIP bridge fee
+const quote = await bridge.quoteBridgeFee({
+  destinationChainId: 296, // Hedera testnet
+  tokenAddress: "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7",
+  amountUnits: 10_000_000n, // 10 units
+  recipientAddress: "0xYourWalletAddress",
 });
 
-// Configure swap limit for safety
-await treasury.setMaxSwapAmount(50_000_000n, walletClient); // Max $50 USDT swap
-
-// Emergency circuit breaker
-await treasury.setPaused(true, walletClient);
+// 2. Build unsigned approve & ccipSend transactions
+const txs = await bridge.buildBridgeTransactions({
+  destinationChainId: 296,
+  tokenAddress: "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7",
+  amountUnits: 10_000_000n,
+  recipientAddress: "0xYourWalletAddress",
+});
+console.log(`Router target: ${txs.to}, value: ${txs.value}`);
 ```
 

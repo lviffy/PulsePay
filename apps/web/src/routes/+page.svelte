@@ -16,7 +16,7 @@
 	const features = [
 		[
 			'Universal checkout.',
-			'One checkout surface for your customers. Direct USDT settlement is live on Whitechain; other-token quotes come from Uniswap’s exact-output API.'
+			'One checkout surface for your customers. Direct USDT settlement is live on Whitechain; cross-chain token bridging is powered by Chainlink CCIP 2.0.'
 		],
 		[
 			'The amount stays exact.',
@@ -31,8 +31,8 @@
 			'Create a plan, let a subscriber authorize it, and charge eligible renewals. Every cycle has a unique renewal ID.'
 		],
 		[
-			'A guard on your treasury.',
-			'A Uniswap v4 hook checks the configured input token, enforces a raw-unit swap limit, and gives the owner a pause switch.'
+			'Cross-chain token bridging.',
+			'Chainlink CCIP 2.0 bridges tokens across Ethereum Sepolia and Hedera Testnet directly to recipient wallets with zero callback gas overhead.'
 		],
 		[
 			'A 402 is an invitation.',
@@ -130,7 +130,7 @@
 	<title>PulsePay — Pay in any token. Settle in USDT.</title>
 	<meta
 		name="description"
-		content="Invoices, reserve-backed refunds and subscriptions on Whitechain. Uniswap treasury controls. Native Hedera agent payments with an HCS audit trail."
+		content="Invoices, reserve-backed refunds and subscriptions on Whitechain. Chainlink CCIP 2.0 token bridging. Native Hedera agent payments with an HCS audit trail."
 	/>
 </svelte:head>
 
@@ -140,8 +140,8 @@
 			<p class="eyebrow">Unified onchain payment stack · ETHGlobal Mumbai</p>
 			<h1 data-hero-title>Pay in any <br />token. <br />Settle in <br />USDT.</h1>
 			<p class="hero-lede">
-				Invoices, reserve-backed refunds and subscriptions on Whitechain. Treasury controls through
-				Uniswap v4. Agents that pay over x402 on Hedera, with an audit trail on consensus.
+				Invoices, reserve-backed refunds and subscriptions on Whitechain. Token bridging through
+				Chainlink CCIP 2.0. Agents that pay over x402 on Hedera, with an audit trail on consensus.
 			</p>
 			<div class="actions">
 				<a href="/merchant" class="button">Open console ↗</a>
@@ -227,14 +227,14 @@
 		<h2>Different inputs. <br />A clear settlement.</h2>
 		<TokenFlow />
 		<div class="flow-labels mono">
-			<span>Tokens / Quote on Uniswap</span>
+			<span>Tokens / Bridge on Chainlink CCIP</span>
 			<span>USDT / Settle on Whitechain</span>
 		</div>
 		<p>
-			Exact-output quotes and direct USDT settlement are available today. Bridging a swap into a
-			Whitechain invoice remains a separate integration.
+			Direct USDT settlement is live on Whitechain; cross-chain bridging across Ethereum Sepolia and
+			Hedera Testnet is handled directly through Chainlink CCIP 2.0 Routers.
 		</p>
-		<a href="/docs/uniswap/universal-checkout" class="text-link mono">Read the settlement path ↗</a>
+		<a href="/docs/ccip/token-bridge" class="text-link mono">Read the bridge guide ↗</a>
 	</section>
 
 	<section id="protocol" class="repo-section section-pad">
@@ -243,7 +243,7 @@
 		<h2>Inspect the rails. <br />Use the real integrations.</h2>
 		<div class="actions integration-links">
 			<a href="/merchant/invoices" class="button">Whitechain invoices ↗</a>
-			<a href="/merchant/treasury" class="button">Treasury policy ↗</a>
+			<a href="/merchant/treasury" class="button">CCIP bridge ↗</a>
 			<a href="/merchant/agents" class="button">Hedera audit trail ↗</a>
 		</div>
 		<SkillInstallWidget />
@@ -256,7 +256,7 @@
 			<a href="/merchant" class="button light">Open console ↗</a>
 			<a href="/docs" class="button outline-light">Read the docs ↗</a>
 		</div>
-		<p class="mono">Whitechain · Uniswap v4 · Hedera x402</p>
+		<p class="mono">Whitechain · Chainlink CCIP 2.0 · Hedera x402</p>
 	</section>
 
 	{#if ready}

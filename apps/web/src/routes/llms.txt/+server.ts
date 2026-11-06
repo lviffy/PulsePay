@@ -6,7 +6,7 @@ export const GET: RequestHandler = async () => {
 
 > Unified merchant billing and native agent payments.
 
-Whitechain Sepolia (1874): real USDT invoices, refunds and subscriptions. Uniswap: exact-output quotes and a treasury guard; no bridge to Whitechain settlement. Hedera: PulsePay's hedera-native-receipt HTTP-402 extension, native HBAR asset 0.0.0 and HCS audit.
+Whitechain Sepolia (1874): real USDT invoices, refunds and subscriptions. Chainlink CCIP 2.0: cross-chain token bridging via official testnet routers. Hedera: PulsePay's hedera-native-receipt HTTP-402 extension, native HBAR asset 0.0.0 and HCS audit.
 
 Every docs URL supports Accept: text/markdown and an explicit .md twin. Read-only API failures return errors; no preview rows are accounting evidence.
 

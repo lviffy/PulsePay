@@ -11,8 +11,6 @@
 		type WalletClient
 	} from 'viem';
 	import { createPulsePay, whitechainSepolia } from '@pulsepay/sdk-core';
-	import { UniswapV4TreasuryAdapter } from '@pulsepay/adapter-uniswap';
-	import { unichainSepolia } from 'viem/chains';
 	import type { MerchantData, InvoiceRow, SubscriptionRow } from '$lib/chain';
 	import DataTable from './DataTable.svelte';
 	import Modal from './Modal.svelte';
@@ -40,7 +38,6 @@
 		usdt: string;
 		merchant: string;
 		merchantName: string;
-		hook: string;
 		topic: string;
 		network: string;
 		serviceUrl: string;
@@ -109,10 +106,12 @@
 	let remoteError = $state<string | null>(null);
 
 	let treasuryData = $state<{
-		maxSwapAmount: string;
-		paused: boolean;
-		owner: string;
-		limitCurrency: string;
+		status: string;
+		protocol: string;
+		sourceChain: string;
+		destinationChain: string;
+		routerAddress: string;
+		explorerUrl: string;
 	} | null>(null);
 	let treasuryLoading = $state(false);
 	let treasuryError = $state<string | null>(null);
@@ -289,13 +288,13 @@
 		fetchMerchantData();
 	}
 
-	async function connectWallet(targetChain: 'whitechain' | 'unichain' = 'whitechain') {
+	async function connectWallet() {
 		const ethereum = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
 		if (!ethereum) throw new Error('Install or open an EVM browser wallet, then connect it here.');
 		const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
 		const account = accounts[0];
 		if (!account) throw new Error('No account was authorized.');
-		const chainId = targetChain === 'whitechain' ? '0x752' : '0x515';
+		const chainId = '0x752';
 		if ((await ethereum.request({ method: 'eth_chainId' })) !== chainId) {
 			await ethereum.request({
 				method: 'wallet_switchEthereumChain',
@@ -304,11 +303,11 @@
 		}
 		const connected = createWalletClient({
 			account,
-			chain: targetChain === 'whitechain' ? whitechainSepolia : unichainSepolia,
+			chain: whitechainSepolia,
 			transport: custom(ethereum)
 		});
 		wallet = connected;
-		if (targetChain === 'whitechain') saveAddress(account);
+		saveAddress(account);
 		return connected;
 	}
 
@@ -345,10 +344,7 @@
 			if (result.receipt.status !== 'success') {
 				throw new Error(`Transaction reverted: ${result.txHash}`);
 			}
-			const explorerUrl =
-				section === 'treasury' && confirm.label.includes('policy')
-					? `https://unichain-sepolia.blockscout.com/tx/${result.txHash}`
-					: `https://explorer.testnet.whitechain.io/tx/${result.txHash}`;
+			const explorerUrl = `https://explorer.testnet.whitechain.io/tx/${result.txHash}`;
 			txNotification = {
 				type: 'success',
 				title: 'Transaction confirmed',
@@ -819,8 +815,6 @@
 							<dd>{config?.usdt || 'Reading…'}</dd>
 							<dt>RPC</dt>
 							<dd>{config?.rpc || 'Reading…'}</dd>
-							<dt>Treasury hook</dt>
-							<dd>{config?.hook || 'Not configured'}</dd>
 							<dt>HCS topic</dt>
 							<dd>{config?.topic || 'Not configured'}</dd>
 							<dt>Service API</dt>
@@ -857,47 +851,35 @@
 			</section>
 
 			<section class="merchant-panel">
-				<p class="eyebrow">Unichain Sepolia / 1301</p>
-				<h2>Treasury guard policy.</h2>
+				<p class="eyebrow">Chainlink CCIP 2.0 / Token Bridging</p>
+				<h2>Cross-chain token bridge.</h2>
 				{#if treasuryLoading}
-					<p>Reading deployed hook…</p>
+					<p>Reading CCIP router configuration…</p>
 				{:else if treasuryError}
 					<p role="alert">{treasuryError} <button class="table-action" onclick={fetchTreasury}>[Retry]</button></p>
 				{:else if treasuryData}
 					<dl class="settings-list">
-						<dt>State</dt>
-						<dd>{treasuryData.paused ? 'PAUSED' : 'ACTIVE'}</dd>
-						<dt>Input limit</dt>
-						<dd>{treasuryData.maxSwapAmount} raw units</dd>
-						<dt>Currency</dt>
-						<dd>{treasuryData.limitCurrency}</dd>
-						<dt>Owner</dt>
-						<dd>{treasuryData.owner}</dd>
+						<dt>Status</dt>
+						<dd>{treasuryData.status}</dd>
+						<dt>Protocol</dt>
+						<dd>{treasuryData.protocol}</dd>
+						<dt>Source</dt>
+						<dd>{treasuryData.sourceChain}</dd>
+						<dt>Destination</dt>
+						<dd>{treasuryData.destinationChain}</dd>
+						<dt>CCIP Router</dt>
+						<dd>{treasuryData.routerAddress}</dd>
+						<dt>Destination Gas</dt>
+						<dd>0 (Token-only bridging)</dd>
 					</dl>
-					<button
+					<a
 						class="button light"
-						onclick={() =>
-							(confirm = {
-								title: treasuryData!.paused ? 'Resume treasury hook' : 'Pause treasury hook',
-								description: `Change the live policy on ${config!.hook}. The connected Unichain wallet must own the hook.`,
-								label: 'Update policy',
-								run: async () => {
-									const active = await connectWallet('unichain');
-									const account =
-										active.account?.address || (await active.getAddresses())[0];
-									if (account?.toLowerCase() !== treasuryData!.owner.toLowerCase()) {
-										throw new Error('The connected wallet does not own this hook.');
-									}
-									const adapter = new UniswapV4TreasuryAdapter({
-										hookAddress: config!.hook as `0x${string}`,
-										walletClient: active
-									});
-									return adapter.setPaused(!treasuryData!.paused);
-								}
-							})}
+						href={treasuryData.explorerUrl}
+						target="_blank"
+						rel="noreferrer"
 					>
-						{treasuryData.paused ? 'Resume' : 'Pause'} hook ↗
-					</button>
+						Open CCIP Explorer ↗
+					</a>
 				{/if}
 			</section>
 		{:else if section === 'exports'}
