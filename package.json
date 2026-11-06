@@ -5,7 +5,7 @@
   "description": "PulsePay: The unified onchain payment & treasury stack for businesses, human customers, and AI agents",
   "scripts": {
     "build": "turbo run build",
-    "dev": "pnpm build && node scripts/dev.mjs",
+    "dev": "node scripts/dev.mjs",
     "lint": "turbo run lint && eslint scripts eslint.config.mjs",
     "test": "pnpm test:unit && pnpm test:contracts",
     "demo": "pnpm --filter pulsepay-sdk-demo start",
@@ -18,7 +18,10 @@
     "contracts:uniswap:test": "node scripts/forge.mjs uniswap-v4 test",
     "test:unit": "turbo run test",
     "test:contracts": "pnpm contracts:whitechain:test && pnpm contracts:uniswap:test",
-    "verify": "pnpm lint && pnpm build && pnpm test && pnpm audit --audit-level=high"
+    "verify": "pnpm lint && pnpm build && pnpm test && pnpm audit --audit-level=high",
+    "dev:web": "node scripts/dev.mjs --web-only",
+    "dev:api": "node scripts/run-app.mjs demo-store --watch",
+    "test:dev": "node --test scripts/dev.test.mjs"
   },
   "keywords": [
     "pulsepay",

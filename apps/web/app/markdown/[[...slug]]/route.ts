@@ -1,0 +1,2 @@
+import { getDoc } from "@/lib/docs";
+export async function GET(_request:Request,{params}:{params:Promise<{slug?:string[]}>}){const{slug}=await params;const doc=await getDoc(slug?.join("/")||"introduction");if(!doc)return new Response("# 404\nDocumentation page not found.",{status:404,headers:{"Content-Type":"text/markdown; charset=utf-8"}});return new Response(`# ${doc.title}\n\n${doc.lede}\n\n${doc.markdown}`,{headers:{"Content-Type":"text/markdown; charset=utf-8","Vary":"Accept"}});}

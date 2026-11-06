@@ -68,3 +68,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Web development output
+.next-dev/
+.svelte-kit/

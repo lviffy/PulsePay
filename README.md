@@ -28,7 +28,11 @@ pnpm --filter pulsepay-demo-store start
 
 Application scripts load the root `.env` automatically and use the repository root as their working directory. Open `http://localhost:3000/merchant`; sign in with the merchant access secret from `.env`. API clients can instead send `x-api-key: <PULSEPAY_API_SECRET>`. Session cookies are HTTP-only, expire after one hour, and use SameSite=Strict. Production requires an HTTPS `PULSEPAY_APP_URL`.
 
-`pnpm dev` builds the workspace, watches TypeScript packages and restarts the demo server when compiled outputs change. It does not launch the buyer agent.
+`npm run dev` (or `pnpm dev`) compiles the SDK packages with at most two builds at once, watches those packages, and runs the Next.js frontend at `http://localhost:3100`. If the root `.env` contains a valid merchant API secret and Hedera merchant account, it also starts the paid demo API on port 3000. `npm run dev:web` starts just the web development flow; `npm run dev:api` starts the configured API separately. The buyer agent is never launched automatically.
+
+The supervisor runs the installed Node CLIs directly and excludes production web builds from its watcher. An `npx`-backed `pnpm` wrapper is rejected before any build starts, preventing recursive launcher processes. `pnpm test:dev` checks both normal startup validation and rejection of that wrapper.
+
+The new UI lives in [apps/web](apps/web/README.md). Configure `WHITECHAIN_MERCHANT_HUB_ADDRESS`, `PULSEPAY_MERCHANT_ADDRESS`, `UNISWAP_TREASURY_HOOK_ADDRESS`, `HEDERA_AUDIT_TOPIC_ID`, and `PULSEPAY_SERVICE_URL` for the real integrations you use. Unconfigured reads show a retryable error; this frontend does not consume the demo server's EVM preview state.
 
 ## Verification
 

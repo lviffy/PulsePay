@@ -1,0 +1,186 @@
+[
+  {
+    "group": "Getting started",
+    "slug": "introduction",
+    "title": "Payments with a paper trail.",
+    "lede": "PulsePay brings merchant billing, treasury controls and native agent payments into one TypeScript workspace. Each chain has an explicit job and its own verification path.",
+    "source": "README.md",
+    "track": "Getting started"
+  },
+  {
+    "group": "Getting started",
+    "slug": "quickstart",
+    "title": "Your first confirmed payment.",
+    "lede": "Build the workspace, configure the merchant hub, then open a real invoice in the React checkout. The amount comes from the contract.",
+    "source": "README.md",
+    "track": "Getting started"
+  },
+  {
+    "group": "Getting started",
+    "slug": "architecture",
+    "title": "Three tracks. Explicit boundaries.",
+    "lede": "Follow value and evidence separately: contract state, transaction receipts, challenge redemption and audit consensus each answer a different question.",
+    "source": "README.md",
+    "track": "Getting started"
+  },
+  {
+    "group": "Whitechain",
+    "slug": "whitechain/merchant-hub",
+    "title": "One contract for the merchant ledger.",
+    "lede": "PulsePayMerchantHub stores invoices, payments, subscription plans and per-merchant balances on Whitechain Sepolia.",
+    "source": "contracts/whitechain/src/PulsePayMerchantHub.sol",
+    "track": "Whitechain"
+  },
+  {
+    "group": "Whitechain",
+    "slug": "whitechain/invoices",
+    "title": "An invoice is a contract record.",
+    "lede": "Create an amount, a due time and an optional customer restriction. Discover the ID from InvoiceCreated and read its current state before payment.",
+    "source": "packages/adapter-whitechain/src/client.ts",
+    "track": "Whitechain"
+  },
+  {
+    "group": "Whitechain",
+    "slug": "whitechain/payments",
+    "title": "Settlement needs evidence.",
+    "lede": "A wallet approval is not a payment. PulsePay reports checkout success after the hub emits a matching PaymentSettled event in a successful receipt.",
+    "source": "packages/adapter-whitechain/src/client.ts",
+    "track": "Whitechain"
+  },
+  {
+    "group": "Whitechain",
+    "slug": "whitechain/refunds",
+    "title": "Refund to the original payer.",
+    "lede": "The reserve backs full and partial refunds against an actual settled invoice. Every refund produces a transaction and cumulative accounting evidence.",
+    "source": "packages/adapter-whitechain/src/client.ts",
+    "track": "Whitechain"
+  },
+  {
+    "group": "Whitechain",
+    "slug": "whitechain/subscriptions",
+    "title": "A plan. A consent. Each cycle.",
+    "lede": "Plans define amount, interval and maximum cycles. Subscribers authorize a plan; eligible renewals settle with an explicit renewal ID.",
+    "source": "packages/adapter-whitechain/src/client.ts",
+    "track": "Whitechain"
+  },
+  {
+    "group": "Whitechain",
+    "slug": "whitechain/csv-export",
+    "title": "A ledger your accountant can read.",
+    "lede": "Export actual payment and refund events with UTC timestamps, raw units and transaction evidence using the shared workspace formatter.",
+    "source": "packages/shared/src/csv.ts",
+    "track": "Whitechain"
+  },
+  {
+    "group": "Uniswap",
+    "slug": "uniswap/universal-checkout",
+    "title": "Exact output, clear boundaries.",
+    "lede": "Quote the input needed for an exact output amount through the server-side Uniswap Trading API. Keep the API key on the server.",
+    "source": "packages/adapter-uniswap/src/routing.ts",
+    "track": "Uniswap"
+  },
+  {
+    "group": "Uniswap",
+    "slug": "uniswap/treasury-guard-hook",
+    "title": "A policy at the pool boundary.",
+    "lede": "TreasuryGuardHook restricts the configured input currency and raw-unit amount for exact-input swaps, with an owner-controlled pause.",
+    "source": "contracts/uniswap-v4/src/TreasuryGuardHook.sol",
+    "track": "Uniswap"
+  },
+  {
+    "group": "Uniswap",
+    "slug": "uniswap/salt-mining",
+    "title": "Deploy at a valid hook address.",
+    "lede": "Uniswap v4 encodes hook permissions in the deployment address. The deployment script mines a deterministic CREATE2 salt for the required flags.",
+    "source": "contracts/uniswap-v4/script/DeployHook.s.sol",
+    "track": "Uniswap"
+  },
+  {
+    "group": "Hedera",
+    "slug": "hedera/x402-agents",
+    "title": "Agents pay in HBAR. Nobody approves.",
+    "lede": "An agent discovers a service, clears its spend policy, answers a 402 challenge and settles in native HBAR. The worker writes an audit trail to consensus.",
+    "source": "packages/sdk-server/src/x402.ts",
+    "track": "Hedera"
+  },
+  {
+    "group": "Hedera",
+    "slug": "hedera/spend-policy",
+    "title": "Decide before the transfer.",
+    "lede": "PulsePaySpendLimitPolicy validates tool and merchant permissions and reserves a bounded transfer budget before the worker spends.",
+    "source": "packages/adapter-hedera/src/policy/PulsePaySpendLimitPolicy.ts",
+    "track": "Hedera"
+  },
+  {
+    "group": "Hedera",
+    "slug": "hedera/hcs-audit-hook",
+    "title": "A payment and its audit are different records.",
+    "lede": "PulsePayHcsAuditHook records settled agent actions on the configured HCS topic. Failed audit submission is retryable without paying again.",
+    "source": "packages/adapter-hedera/src/hooks/PulsePayHcsAuditHook.ts",
+    "track": "Hedera"
+  },
+  {
+    "group": "Hedera",
+    "slug": "hedera/agent-plugin",
+    "title": "Plug policy and audit into the worker.",
+    "lede": "PulsePayHederaPlugin binds native HBAR payment and refund tools to the supplied Agent Kit context and its seven-stage lifecycle.",
+    "source": "packages/adapter-hedera/src/plugin.ts",
+    "track": "Hedera"
+  },
+  {
+    "group": "SDK",
+    "slug": "sdk/react",
+    "title": "A checkout that reads the invoice.",
+    "lede": "Wrap the checkout with PulsePayProvider. Supply the deployed merchant hub and let the widget read the amount, request the wallet and verify settlement.",
+    "source": "packages/sdk-react/src/checkout.tsx",
+    "track": "SDK"
+  },
+  {
+    "group": "SDK",
+    "slug": "sdk/core",
+    "title": "One client. Explicit adapters.",
+    "lede": "createPulsePay constructs Whitechain, quote routing and optional treasury adapters and exposes their real methods through typed groups.",
+    "source": "packages/sdk-core/src/index.ts",
+    "track": "SDK"
+  },
+  {
+    "group": "SDK",
+    "slug": "sdk/server",
+    "title": "The receipt is checked on the server.",
+    "lede": "The server SDK publishes service terms and gates paid API responses on independently verified native Hedera receipts.",
+    "source": "packages/sdk-server/src/x402.ts",
+    "track": "SDK"
+  },
+  {
+    "group": "Reference",
+    "slug": "reference/contracts",
+    "title": "Deployed interfaces, without guessed addresses.",
+    "lede": "The repository contains merchant billing and treasury contracts. Deployment addresses are environment configuration, not constants invented by the website.",
+    "source": "contracts/whitechain/src/PulsePayMerchantHub.sol",
+    "track": "Reference"
+  },
+  {
+    "group": "Reference",
+    "slug": "reference/environment",
+    "title": "Configuration follows the trust boundary.",
+    "lede": "Public chain addresses may reach the browser. API credentials, signing keys, challenge state and service secrets stay on the server.",
+    "source": ".env.example",
+    "track": "Reference"
+  },
+  {
+    "group": "Reference",
+    "slug": "reference/errors",
+    "title": "A failed read stays a failed read.",
+    "lede": "The interface keeps the last request\u2019s error visible and provides a retry. It never fills an unavailable chain with demonstration activity.",
+    "source": "packages/adapter-whitechain/src/client.ts",
+    "track": "Reference"
+  },
+  {
+    "group": "Reference",
+    "slug": "reference/feedback",
+    "title": "Verify the behavior. Share the evidence.",
+    "lede": "Use the repository\u2019s test and feedback records to make reproducible reports with a route, chain, transaction and expected outcome.",
+    "source": "docs/VERIFICATION.md",
+    "track": "Reference"
+  }
+]
