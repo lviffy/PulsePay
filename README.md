@@ -2,11 +2,11 @@
 
 
 
-+**A payment gateway for merchants, customers, and AI agents.**
+**A payment gateway for merchants, customers, and AI agents.**
 
 PulsePay brings USDT checkout, subscription billing, refunds, and paid API access into one developer toolkit and merchant dashboard. Whitechain handles merchant billing, Hedera supports agent payments and audit records, and Chainlink CCIP enables transfers between supported networks.
 
-[Problem](#the-problem) · [Solution](#the-solution) · [Architecture](#architecture) · [Whitechain](#whitechain) · [Hedera](#hedera) · [Chainlink](#chainlink) · [Quickstart](#quickstart)
+[Problem](#the-problem) · [Solution](#the-solution) · [Architecture](#architecture) · [Whitechain](#whitechain) · [Qualification Evidence](#whitechain-qualification-evidence) · [Hedera](#hedera) · [Chainlink](#chainlink) · [Quickstart](#quickstart)
 
 ## The Problem
 
@@ -59,6 +59,19 @@ Each integration has a distinct role. CCIP delivery funds a destination wallet; 
 Whitechain uses chain ID `1874`, USDT with six decimals, and WBT for gas. Each renewal requires a transaction. The console supports plan creation, renewal charges, and cancellation; subscriber enrollment uses the SDK or contract.
 
 [Integration guide](docs/WHITECHAIN_USAGE.md) · [Merchant hub](contracts/whitechain/src/PulsePayMerchantHub.sol) · [Whitechain adapter](packages/adapter-whitechain)
+
+## Whitechain Qualification Evidence
+
+- Network: Whitechain Sepolia — Chain ID 1874
+- Verified merchant hub: https://explorer.testnet.whitechain.io/address/0xC81399e6344f9264830ecB6DF46a5e9458f4f2C3
+- Official USDT: https://explorer.testnet.whitechain.io/address/0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7
+- Successful USDT payment: https://explorer.testnet.whitechain.io/tx/0xfd1e2c2af8bb8e3c192cfab6f252667bb37c4c77f89840dc77a5d2d2081cb10e
+- Demo video: REPLACE_WITH_VIDEO_URL
+
+PulsePay needs on-chain settlement because it provides merchants and
+customers with independently verifiable payment receipts, programmable
+refund reserves, and transparent billing state without relying on a
+central payment processor or custodial database.
 
 ## Hedera
 

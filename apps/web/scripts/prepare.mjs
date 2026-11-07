@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
+import './generate-snippets.mjs';
 
 const staticDir = new URL('../static/', import.meta.url);
 await mkdir(staticDir, { recursive: true });
