@@ -79,6 +79,7 @@
 	let merchant = $state('');
 	let addressInput = $state('');
 	let wallet = $state<WalletClient | null>(null);
+	let walletConnecting = $state(false);
 	let chain = $state<'whitechain' | 'hedera'>('whitechain');
 	let lastWhitechainSection = $state('invoices');
 	let filter = $state('');
@@ -309,6 +310,27 @@
 		wallet = connected;
 		saveAddress(account);
 		return connected;
+	}
+
+	async function requestWalletConnection() {
+		if (walletConnecting) return;
+		walletConnecting = true;
+		try {
+			const connected = await connectWallet();
+			txNotification = {
+				type: 'success',
+				title: 'Wallet connected',
+				message: short(connected.account?.address || merchant)
+			};
+		} catch (err) {
+			txNotification = {
+				type: 'error',
+				title: 'Wallet connection failed',
+				message: message(err)
+			};
+		} finally {
+			walletConnecting = false;
+		}
 	}
 
 	async function getBillingClient() {
@@ -640,6 +662,22 @@
 			</div>
 		</header>
 
+		{#if !wallet && chain === 'whitechain'}
+			<section class="wallet-prompt" aria-labelledby="wallet-prompt-title">
+				<div>
+					<p class="eyebrow">Wallet not connected</p>
+					<h2 id="wallet-prompt-title">Connect your merchant wallet.</h2>
+					<p>
+						A saved address only shows public account data. Connect the matching wallet to create
+						invoices, issue refunds, and manage funds.
+					</p>
+				</div>
+				<button class="wallet-connect-button" onclick={requestWalletConnection} disabled={walletConnecting}>
+					{walletConnecting ? 'Connecting…' : 'Connect wallet →'}
+				</button>
+			</section>
+		{/if}
+
 		{#if !['settings', 'agents'].includes(section) && chain === 'whitechain'}
 			<div class="metric-grid">
 				<div class="metric-cell">
@@ -784,21 +822,17 @@
 							}
 						}}
 					>
-						<label for="settings-addr-input">Merchant wallet address</label>
+						<label for="settings-addr-input">Merchant address for public data</label>
 						<input
 							id="settings-addr-input"
 							bind:value={addressInput}
 							placeholder="0x…"
 						/>
-						<button class="button light" type="submit">Use this address ↗</button>
+						<button class="button light" type="submit">View this address ↗</button>
 					</form>
-					<button
-						class="table-action"
-						style="margin-top: 20px;"
-						onclick={() => connectWallet().catch((err) => (txNotification = { type: 'error', title: 'Wallet error', message: err.message }))}
-					>
-						[Connect merchant wallet]
-					</button>
+					{#if wallet?.account?.address}
+						<p class="wallet-connected"><i class="status-dot"></i> Connected as {short(wallet.account.address)}</p>
+					{/if}
 				</section>
 
 				<section class="merchant-panel">
