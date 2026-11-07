@@ -3,7 +3,7 @@
 	import type { SourceFile } from '$lib/source';
 	import CopyButton from './CopyButton.svelte';
 	import Palette from './Palette.svelte';
-	import { gsap } from '$lib/motion';
+	import { gsap, scrollPageBy } from '$lib/motion';
 
 	interface Props {
 		files: Pick<SourceFile, 'path'>[];
@@ -116,34 +116,45 @@
 		};
 		window.addEventListener('keydown', handleKey);
 
+		const handleWheel = (event: WheelEvent) => {
+			if (!pinned || event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+			if (!(event.target instanceof Element) || !event.target.closest('.code-content, .file-tree')) return;
+			event.preventDefault();
+			const unit = event.deltaMode === 1 ? 20 : event.deltaMode === 2 ? window.innerHeight : 1;
+			scrollPageBy(event.deltaY * unit);
+		};
+		scope?.addEventListener('wheel', handleWheel, { passive: false });
+
 		let mm: gsap.MatchMedia | undefined;
 		if (pinned && scope && stage) {
 			mm = gsap.matchMedia();
 			mm.add('(min-width: 900px) and (prefers-reduced-motion: no-preference)', () => {
-				gsap.timeline({
+				const zoomScale = () => {
+					const height = scope!.offsetHeight;
+					const scale = Math.max(1, Math.min(
+						1.3,
+						(document.documentElement.clientWidth - 64) / stage!.clientWidth,
+						(window.innerHeight - 120) / height
+					));
+					stage!.style.setProperty('--ide-zoom-space', `${height * (scale - 1)}px`);
+					return scale;
+				};
+				gsap.to(scope, {
 					scrollTrigger: {
-						trigger: stage, start: 'top 24px', end: () => `+=${window.innerHeight * 2}`,
-						pin: true, scrub: 0.6, anticipatePin: 1, invalidateOnRefresh: true
-					}
-				})
-					.to(scope, {
-						width: () => document.documentElement.clientWidth,
-						height: () => window.innerHeight,
-						x: () => -stage!.getBoundingClientRect().left,
-						y: -24, borderRadius: 0, duration: 0.3, ease: 'power2.inOut'
-					})
-					.to({}, { duration: 0.4 })
-					.to(scope, {
-						width: () => stage!.clientWidth,
-						height: () => stage!.clientHeight,
-						x: 0, y: 0, borderRadius: 14, duration: 0.3, ease: 'power2.inOut'
-					});
+						trigger: stage, start: 'top 85%', end: 'top 24px',
+						scrub: true, invalidateOnRefresh: true
+					},
+					scale: zoomScale,
+					transformOrigin: 'center top', ease: 'none'
+				});
+				return () => stage?.style.removeProperty('--ide-zoom-space');
 			});
 		}
 
 		return () => {
 			clearTimeout(prefetchTimer);
 			window.removeEventListener('keydown', handleKey);
+			scope?.removeEventListener('wheel', handleWheel);
 			mm?.revert();
 		};
 	});
@@ -169,7 +180,6 @@
 				</button>
 			{/each}
 		</div>
-		<span class="mono ide-caption">This is the actual SDK.</span>
 		<div class="ide-keys">
 			<button onclick={() => (terminal = !terminal)} aria-label="Ctrl J: toggle terminal">
 				CTRL J
@@ -258,6 +268,8 @@
 			<div
 				class="code-content"
 				bind:this={content}
+				role="region"
+				aria-label="Source code"
 				tabindex="0"
 				data-lenis-prevent
 			>

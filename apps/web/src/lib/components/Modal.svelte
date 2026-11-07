@@ -28,7 +28,7 @@
 
 <dialog
 	bind:this={dialog}
-	class="palette"
+	class="palette merchant-modal"
 	style="padding: 24px; max-width: 600px; color-scheme: light; color: var(--ink);"
 	oncancel={() => onclose?.()}
 	onclick={handleBackdrop}
@@ -43,4 +43,41 @@
 		{@render children?.()}
 	</div>
 </dialog>
+
+<style>
+	.palette.merchant-modal :global(.merchant-form input),
+	.palette.merchant-modal :global(.merchant-form select),
+	.palette.merchant-modal :global(.merchant-form textarea) {
+		color: var(--ink);
+		caret-color: var(--ink);
+		background: var(--cream);
+		color-scheme: light;
+		width: 100%;
+		margin: 0;
+	}
+	.palette.merchant-modal :global(.merchant-form input::placeholder),
+	.palette.merchant-modal :global(.merchant-form textarea::placeholder) {
+		color: var(--muted);
+		opacity: 1;
+	}
+	.palette.merchant-modal :global(.button.light) {
+		background: var(--ink);
+		color: var(--cream);
+		border-color: var(--ink);
+	}
+	.palette.merchant-modal :global(.button.light:hover) {
+		background: #393934;
+	}
+	.palette.merchant-modal :global(.button.outline-light) {
+		background: transparent;
+		color: var(--ink);
+		border-color: var(--muted);
+	}
+	.palette.merchant-modal :global(.button.outline-light:hover) {
+		background: var(--soft);
+	}
+	.palette.merchant-modal :global(.merchant-notice) {
+		color: var(--muted);
+	}
+</style>
 

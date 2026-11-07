@@ -10,6 +10,7 @@
 	} from 'viem';
 	import { createPulsePay, whitechainSepolia, type Invoice } from '@pulsepay/sdk-core';
 	import { WHITECHAIN_SEPOLIA_EXPLORER } from '@pulsepay/shared';
+	import Mark from '$lib/components/Mark.svelte';
 
 	let input = $state('');
 	let id = $state('');
@@ -173,6 +174,9 @@
 
 <main id="main" class="checkout-page">
 	<div>
+		<a href="/" class="brand" style="margin-bottom: 24px; display: inline-flex;" aria-label="PulsePay home">
+			<Mark /> <span>PulsePay</span>
+		</a>
 		<p class="eyebrow">LIVE SDK / DIRECT USDT</p>
 		<h1>Try the real<br />checkout.</h1>
 		<p class="lede">
@@ -214,7 +218,10 @@
 			<div style="margin-top: 30px;">
 				<div class="sdk-widget">
 					<div class="sdk-widget-head">
-						<h3>PulsePay checkout</h3>
+						<div style="display: flex; align-items: center; gap: 8px;">
+							<Mark class="mark-sm" />
+							<h3>PulsePay checkout</h3>
+						</div>
 						<span class="sdk-network">Whitechain Sepolia</span>
 					</div>
 

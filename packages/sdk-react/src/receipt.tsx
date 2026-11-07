@@ -1,5 +1,6 @@
 import React from "react";
 import { WHITECHAIN_SEPOLIA_EXPLORER, type PaymentStatus } from "@pulsepay/shared";
+import { PulsePayMark } from "./mark.js";
 
 export interface PulsePayReceiptProps {
   invoiceId: string;
@@ -15,7 +16,7 @@ export interface PulsePayReceiptProps {
 export function PulsePayReceipt({ invoiceId, merchantAddress, customerAddress, amountPaidUsdt, amountRefundedUsdt = "0", status, paymentTxHash, refundTxHashes = [] }: PulsePayReceiptProps) {
   const compact = (value: string) => `${value.slice(0, 10)}…${value.slice(-6)}`;
   return <section className="sdk-receipt" aria-label="Payment receipt" style={{ fontFamily: "var(--font-space, sans-serif)", background: "#f1efe7", color: "#20201e" }}>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, borderBottom: "1px solid #d2d0c7", paddingBottom: 20 }}><h3 style={{ fontSize: 21, margin: 0 }}>Customer receipt</h3><span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 9 }}>{status.replaceAll("_", " ")}</span></div>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, borderBottom: "1px solid #d2d0c7", paddingBottom: 20 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><PulsePayMark size={20} /><h3 style={{ fontSize: 21, margin: 0 }}>Customer receipt</h3></div><span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 9 }}>{status.replaceAll("_", " ")}</span></div>
     <dl style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px", fontFamily: "var(--font-mono, monospace)", fontSize: 10, lineHeight: 1.7, padding: "20px 0", margin: 0, borderBottom: "1px solid #d2d0c7" }}>
       <dt>INVOICE</dt><dd style={{ margin: 0, textAlign: "right" }} title={invoiceId}>{compact(invoiceId)}</dd>
       <dt>MERCHANT</dt><dd style={{ margin: 0, textAlign: "right" }} title={merchantAddress}>{compact(merchantAddress)}</dd>

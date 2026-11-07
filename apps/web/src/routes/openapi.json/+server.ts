@@ -61,10 +61,10 @@ export const GET: RequestHandler = async () => {
 						}
 					],
 					responses: {
-						200: { description: 'Settled invoice and payment' },
+						200: { description: 'Contract invoice and payment; evidenceWarning is set if the settlement transaction link is unavailable' },
 						400: { description: 'Invalid bytes32 ID' },
 						404: { description: 'No settled payment' },
-						503: { description: 'Read or transaction evidence unavailable' }
+						503: { description: 'Contract read or configuration unavailable' }
 					}
 				}
 			},

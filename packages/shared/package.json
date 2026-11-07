@@ -1,6 +1,6 @@
 {
   "name": "@pulsepay/shared",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Shared schemas, types, and constants for PulsePay",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

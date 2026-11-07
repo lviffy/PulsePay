@@ -1,6 +1,6 @@
 {
   "name": "@pulsepay/adapter-hedera",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Hedera Agent Kit v4 policy, HCS audit hook, and x402 payment adapter for PulsePay",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

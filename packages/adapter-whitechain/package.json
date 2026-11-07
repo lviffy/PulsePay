@@ -1,6 +1,6 @@
 {
   "name": "@pulsepay/adapter-whitechain",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Whitechain EVM client, ABI bindings, and indexer for PulsePay",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

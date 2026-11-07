@@ -216,6 +216,16 @@ npm install @pulsepay/adapter-ccip viem
 npm install @pulsepay/adapter-hedera @hashgraph/hedera-agent-kit @hiero-ledger/sdk viem
 ```
 
+| Package | Version | npm | Description |
+| :--- | :--- | :--- | :--- |
+| [`@pulsepay/sdk-core`](packages/sdk-core) | `1.1.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/sdk-core)](https://www.npmjs.com/package/@pulsepay/sdk-core) | Core TypeScript client, CCIP bridging, invoice/subscription lifecycle |
+| [`@pulsepay/sdk-react`](packages/sdk-react) | `1.1.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/sdk-react)](https://www.npmjs.com/package/@pulsepay/sdk-react) | React checkout widget, receipt verifier, and billing components |
+| [`@pulsepay/sdk-server`](packages/sdk-server) | `1.1.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/sdk-server)](https://www.npmjs.com/package/@pulsepay/sdk-server) | Server middleware, x402 resource server gateway, and webhooks |
+| [`@pulsepay/shared`](packages/shared) | `1.1.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/shared)](https://www.npmjs.com/package/@pulsepay/shared) | Shared schemas, Zod types, and accountant CSV formatters |
+| [`@pulsepay/adapter-whitechain`](packages/adapter-whitechain) | `1.1.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-whitechain)](https://www.npmjs.com/package/@pulsepay/adapter-whitechain) | Whitechain EVM client, ABI bindings, and indexer |
+| [`@pulsepay/adapter-ccip`](packages/adapter-ccip) | `1.1.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-ccip)](https://www.npmjs.com/package/@pulsepay/adapter-ccip) | Chainlink CCIP 2.0 cross-chain token bridging adapter |
+| [`@pulsepay/adapter-hedera`](packages/adapter-hedera) | `1.1.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-hedera)](https://www.npmjs.com/package/@pulsepay/adapter-hedera) | Hedera Agent Kit v4 spend policy, HCS audit hook & x402 |
+
 `createPulsePay(config)` exposes `invoices`, `payments`, `subscriptions`, and `bridgeOps` through [the core SDK](packages/sdk-core/src/index.ts). Supply a viem wallet client for contract writes. Hedera agent tools use the dedicated adapter.
 
 ### Run Locally

@@ -15,7 +15,7 @@
 			label: 'Core SDK',
 			pkg: '@pulsepay/sdk-core',
 			npmCmd: 'npm install @pulsepay/sdk-core viem',
-			version: 'v1.0.0',
+			version: 'v1.1.0',
 			description: 'Unified client for invoices, subscriptions, universal checkout quotes, and multi-chain settlement.',
 			npmUrl: 'https://www.npmjs.com/package/@pulsepay/sdk-core'
 		},
@@ -24,7 +24,7 @@
 			label: 'React Checkout',
 			pkg: '@pulsepay/sdk-react',
 			npmCmd: 'npm install @pulsepay/sdk-react @pulsepay/sdk-core viem react react-dom',
-			version: 'v1.0.0',
+			version: 'v1.1.0',
 			description: 'Drop-in React checkout modal, receipt view, and billing components.',
 			npmUrl: 'https://www.npmjs.com/package/@pulsepay/sdk-react'
 		},
@@ -33,7 +33,7 @@
 			label: 'Server Middleware',
 			pkg: '@pulsepay/sdk-server',
 			npmCmd: 'npm install @pulsepay/sdk-server @pulsepay/shared',
-			version: 'v1.0.0',
+			version: 'v1.1.0',
 			description: 'x402 Payment Required middleware, Hedera EVM invoices, and webhook verification.',
 			npmUrl: 'https://www.npmjs.com/package/@pulsepay/sdk-server'
 		},
@@ -42,7 +42,7 @@
 			label: 'Whitechain Adapter',
 			pkg: '@pulsepay/adapter-whitechain',
 			npmCmd: 'npm install @pulsepay/adapter-whitechain viem',
-			version: 'v1.0.0',
+			version: 'v1.1.0',
 			description: 'EVM client bindings and transaction encoders for PulsePayMerchantHub on Whitechain.',
 			npmUrl: 'https://www.npmjs.com/package/@pulsepay/adapter-whitechain'
 		},
@@ -51,7 +51,7 @@
 			label: 'Hedera Adapter',
 			pkg: '@pulsepay/adapter-hedera',
 			npmCmd: 'npm install @pulsepay/adapter-hedera @hashgraph/hedera-agent-kit @hiero-ledger/sdk viem',
-			version: 'v1.0.0',
+			version: 'v1.1.0',
 			description: 'Hedera Agent Kit v4 spend policy, HCS audit logging, and native HBAR/EVM payments.',
 			npmUrl: 'https://www.npmjs.com/package/@pulsepay/adapter-hedera'
 		},
@@ -60,7 +60,7 @@
 			label: 'CCIP Adapter',
 			pkg: '@pulsepay/adapter-ccip',
 			npmCmd: 'npm install @pulsepay/adapter-ccip viem',
-			version: 'v1.0.0',
+			version: 'v1.1.0',
 			description: 'Chainlink CCIP 2.0 cross-chain token bridging and Router transaction builders.',
 			npmUrl: 'https://www.npmjs.com/package/@pulsepay/adapter-ccip'
 		}
@@ -128,173 +128,94 @@
 
 <style>
 	.sdk-install-box {
-		background: #141412;
-		color: var(--cream, #f7f6f0);
-		border: 1px solid #383830;
-		border-radius: 10px;
-		margin: 20px 0 28px;
-		overflow: hidden;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+		max-width: 1330px;
+		margin: 32px auto 0;
+		color: var(--ink);
+		border-top: 1px solid var(--rule);
+		border-bottom: 1px solid var(--rule);
+	}
+
+	.install-header, .header-left, .install-tabs, .code-strip {
+		display: flex;
+		align-items: center;
 	}
 
 	.install-header {
-		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: 16px;
+		padding: 18px 0;
+		border-bottom: 1px solid var(--rule);
+	}
+
+	.header-left { flex-wrap: wrap; gap: 12px; min-width: 0; }
+	.npm-tag { color: var(--muted); font-size: 9px; letter-spacing: .1em; }
+	.pkg-link {
+		display: inline-flex;
 		flex-wrap: wrap;
 		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		padding: 12px 18px 0;
-		background: #191916;
-		border-bottom: 1px solid #33332c;
+		gap: 8px;
+		font-size: 11px;
+		text-transform: none;
+		overflow-wrap: anywhere;
 	}
-
-	.header-left {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin-bottom: 10px;
-	}
-
-	.npm-tag {
-		background: #cb3837;
-		color: #ffffff;
-		font-size: 9px;
-		font-weight: 700;
-		letter-spacing: 0.08em;
-		padding: 2px 6px;
-		border-radius: 3px;
-	}
-
-	.pkg-link {
-		color: var(--cream, #f7f6f0);
-		font-size: 12px;
-		text-decoration: none;
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		transition: color 0.15s ease;
-	}
-
-	.pkg-link:hover {
-		color: var(--orange, #ff6b35);
-	}
-
-	.badge {
-		background: #272722;
-		color: #9c9a8e;
-		font-size: 10px;
-		padding: 1px 6px;
-		border-radius: 3px;
-		border: 1px solid #3c3c34;
-	}
-
-	.install-tabs {
-		display: flex;
-		gap: 2px;
-		overflow-x: auto;
-		scrollbar-width: none;
-		margin-bottom: -1px;
-	}
-
-	.install-tabs::-webkit-scrollbar {
-		display: none;
-	}
-
+	.pkg-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+	.badge { color: var(--muted); font-size: 9px; }
+	.install-tabs { max-width: 100%; gap: 4px; overflow-x: auto; }
 	.tab-btn {
-		font-family: var(--mono, monospace);
-		font-size: 10px;
-		letter-spacing: 0.04em;
+		flex-shrink: 0;
+		font: 9px var(--mono);
+		letter-spacing: .04em;
 		text-transform: uppercase;
-		padding: 8px 12px;
+		padding: 9px 10px;
 		background: transparent;
-		color: #9a988c;
-		border: 1px solid transparent;
-		border-bottom: 2px solid transparent;
-		border-radius: 5px 5px 0 0;
+		color: var(--muted);
+		border: 0;
+		border-radius: 4px;
 		cursor: pointer;
 		white-space: nowrap;
-		transition: all 0.15s ease;
+		transition: background-color .18s, color .18s;
 	}
-
-	.tab-btn:hover {
-		color: var(--cream, #f7f6f0);
-		background: #22221e;
-	}
-
-	.tab-btn.active {
-		color: var(--cream, #f7f6f0);
-		background: #141412;
-		border-color: #383830 #383830 transparent;
-		border-bottom: 2px solid var(--orange, #ff6b35);
-		font-weight: 500;
-	}
-
-	.install-body {
-		padding: 16px 18px;
-	}
-
-	.code-strip {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		background: #0d0d0c;
-		border: 1px solid #282823;
-		border-radius: 6px;
-		padding: 10px 14px;
-	}
-
-	.cli-prompt {
-		color: var(--orange, #ff6b35);
-		font-weight: bold;
-		user-select: none;
-	}
-
+	.tab-btn:hover { background: var(--soft); color: var(--ink); }
+	.tab-btn.active { background: var(--ink); color: var(--cream); }
+	.install-body { padding: 18px 0; }
+	.code-strip { gap: 12px; min-width: 0; }
+	.cli-prompt { color: var(--muted); user-select: none; }
 	.install-code {
 		flex: 1;
+		min-width: 0;
 		font-size: 12px;
-		color: #e5e4dc;
-		word-break: break-all;
+		letter-spacing: 0;
+		text-transform: none;
+		overflow-wrap: anywhere;
 	}
-
 	.copy-pill {
-		background: #242420;
-		color: var(--cream, #f7f6f0);
-		border: 1px solid #44443b;
+		flex-shrink: 0;
+		background: transparent;
+		color: var(--ink);
+		border: 1px solid var(--rule);
 		border-radius: 4px;
-		padding: 5px 12px;
-		font-size: 10px;
-		text-transform: uppercase;
+		padding: 9px 14px;
+		font-size: 9px;
 		cursor: pointer;
-		transition: all 0.15s ease;
-		white-space: nowrap;
+		transition: background-color .18s, transform .18s;
 	}
-
-	.copy-pill:hover {
-		background: var(--orange, #ff6b35);
-		color: #000;
-		border-color: var(--orange, #ff6b35);
-	}
-
+	.copy-pill:hover { background: var(--soft); transform: translateY(-2px); }
+	.copy-pill:active { transform: translateY(1px); }
 	.install-desc {
-		margin-top: 10px;
-		font-size: 11px;
-		color: #8c8b80;
-		line-height: 1.5;
+		margin: 12px 0 0;
+		font-size: 10px;
+		line-height: 1.7;
+		letter-spacing: .025em;
+		text-transform: none;
+		color: var(--muted);
 	}
-
-	.desc-bullet {
-		color: var(--orange, #ff6b35);
-	}
-
+	.desc-bullet { margin-right: 5px; }
 	@media (max-width: 640px) {
-		.code-strip {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 8px;
-		}
-
-		.copy-pill {
-			align-self: flex-end;
-		}
+		.install-header { align-items: flex-start; gap: 14px; }
+		.install-tabs { width: 100%; }
+		.install-code { font-size: 11px; }
+		.code-strip { flex-wrap: wrap; }
+		.copy-pill { margin-left: auto; }
 	}
 </style>

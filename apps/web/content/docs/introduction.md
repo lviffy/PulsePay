@@ -29,13 +29,13 @@ All packages are published under the `@pulsepay` scope on the npm registry:
 
 | Package | npm registry | Responsibility |
 | --- | --- | --- |
-| `@pulsepay/sdk-core` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/sdk-core) | Unified SDK entry point, invoice/subscription lifecycle, quote routing |
-| `@pulsepay/sdk-react` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/sdk-react) | Drop-in React checkout widget & billing components |
-| `@pulsepay/sdk-server` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/sdk-server) | Server middleware, x402 resource server gateway, and webhooks |
-| `@pulsepay/adapter-whitechain` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/adapter-whitechain) | Whitechain EVM client & contract ABI bindings |
-| `@pulsepay/adapter-ccip` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/adapter-ccip) | Chainlink CCIP 2.0 cross-chain token bridging |
-| `@pulsepay/adapter-hedera` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/adapter-hedera) | Hedera Agent Kit v4 spend policy & HCS audit hook |
-| `@pulsepay/shared` | [npm v1.0.0](https://www.npmjs.com/package/@pulsepay/shared) | Shared schemas, Zod types, and accountant CSV utilities |
+| `@pulsepay/sdk-core` | [npm v1.1.0](https://www.npmjs.com/package/@pulsepay/sdk-core) | Unified SDK entry point, CCIP bridging, invoice/subscription lifecycle |
+| `@pulsepay/sdk-react` | [npm v1.1.0](https://www.npmjs.com/package/@pulsepay/sdk-react) | Drop-in React checkout widget & billing components |
+| `@pulsepay/sdk-server` | [npm v1.1.0](https://www.npmjs.com/package/@pulsepay/sdk-server) | Server middleware, x402 resource server gateway, and webhooks |
+| `@pulsepay/adapter-whitechain` | [npm v1.1.0](https://www.npmjs.com/package/@pulsepay/adapter-whitechain) | Whitechain EVM client & contract ABI bindings |
+| `@pulsepay/adapter-ccip` | [npm v1.1.0](https://www.npmjs.com/package/@pulsepay/adapter-ccip) | Chainlink CCIP 2.0 cross-chain token bridging |
+| `@pulsepay/adapter-hedera` | [npm v1.1.0](https://www.npmjs.com/package/@pulsepay/adapter-hedera) | Hedera Agent Kit v4 spend policy & HCS audit hook |
+| `@pulsepay/shared` | [npm v1.1.0](https://www.npmjs.com/package/@pulsepay/shared) | Shared schemas, Zod types, and accountant CSV utilities |
 
 ## 04 / Walkthrough
 
