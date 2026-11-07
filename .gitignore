@@ -21,6 +21,7 @@ skills-lock.json
 .windsurf/
 
 # Local binaries & caches
+.vercel/
 .bin/
 .turbo/
 dist/
