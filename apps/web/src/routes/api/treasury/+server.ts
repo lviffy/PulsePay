@@ -3,12 +3,19 @@ import {
 	CCIP_CHAIN_SELECTORS,
 	WHITECHAIN_SEPOLIA_CHAIN_ID,
 	ETHEREUM_SEPOLIA_CHAIN_ID,
-	WHITECHAIN_USDT_ADDRESS,
-	DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
-	DEFAULT_WHITECHAIN_MAPPER_ADDRESS
+	WHITECHAIN_USDT_ADDRESS
 } from '@pulsepay/adapter-ccip';
 import { stringify, errorMessage } from '$lib/chain';
 import type { RequestHandler } from './$types';
+
+const whitechainBridgeStatus = {
+	sourceChainId: WHITECHAIN_SEPOLIA_CHAIN_ID,
+	destinationChainId: ETHEREUM_SEPOLIA_CHAIN_ID,
+	token: WHITECHAIN_USDT_ADDRESS,
+	tokenDecimals: 6,
+	status: 'DISABLED',
+	reason: 'Bridge contracts are not deployed and no destination settlement relayer is configured'
+};
 
 export const GET: RequestHandler = async () => {
 	try {
@@ -28,38 +35,12 @@ export const GET: RequestHandler = async () => {
 			tokenSupport: 'Not checked — quote the selected token before preparing a transfer',
 			gasLimit: 0,
 			explorerUrl: 'https://ccip.chain.link',
-			whitechainUsdtBridgeLane: {
-				sourceChainId: WHITECHAIN_SEPOLIA_CHAIN_ID,
-				destinationChainId: ETHEREUM_SEPOLIA_CHAIN_ID,
-				destinationChainSelector: CCIP_CHAIN_SELECTORS[ETHEREUM_SEPOLIA_CHAIN_ID]?.toString(),
-				token: WHITECHAIN_USDT_ADDRESS,
-				tokenDecimals: 6,
-				bridgeContract: DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
-				mapperContract: DEFAULT_WHITECHAIN_MAPPER_ADDRESS,
-				minAmount: '10',
-				maxAmount: '5000',
-				dailyLimit: '20000',
-				transferType: 'LOCK_RELEASE',
-				status: 'READY'
-			}
+			whitechainUsdtBridgeLane: whitechainBridgeStatus
 		}), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 	} catch (error) {
 		return new Response(stringify({
 			error: errorMessage(error),
-			whitechainUsdtBridgeLane: {
-				sourceChainId: WHITECHAIN_SEPOLIA_CHAIN_ID,
-				destinationChainId: ETHEREUM_SEPOLIA_CHAIN_ID,
-				destinationChainSelector: CCIP_CHAIN_SELECTORS[ETHEREUM_SEPOLIA_CHAIN_ID]?.toString(),
-				token: WHITECHAIN_USDT_ADDRESS,
-				tokenDecimals: 6,
-				bridgeContract: DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
-				mapperContract: DEFAULT_WHITECHAIN_MAPPER_ADDRESS,
-				minAmount: '10',
-				maxAmount: '5000',
-				dailyLimit: '20000',
-				transferType: 'LOCK_RELEASE',
-				status: 'READY'
-			}
+			whitechainUsdtBridgeLane: whitechainBridgeStatus
 		}), {
 			status: 503, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
 		});

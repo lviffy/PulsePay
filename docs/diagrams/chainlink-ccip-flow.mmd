@@ -1,0 +1,10 @@
+flowchart LR
+    App["PulsePay application"] -->|Validate route and quote fee| Adapter["CCIP adapter"]
+    Adapter --> Router["Source router"]
+    Wallet["User wallet"] -->|Approve token and call ccipSend| Router
+    Router --> OnRamp["CCIP on-ramp"]
+    OnRamp --> Network["CCIP verification and execution"]
+    Network --> OffRamp["Destination off-ramp"]
+    OffRamp --> Pool["Destination token pool"]
+    Pool --> Recipient["Recipient wallet"]
+    Adapter -.->|Track message ID| Status["CCIP API and Explorer"]

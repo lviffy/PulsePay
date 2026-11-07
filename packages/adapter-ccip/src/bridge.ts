@@ -15,7 +15,6 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
 import {
   CCIP_ROUTER_ABI,
   CCIP_ONRAMP_ABI,
@@ -25,8 +24,9 @@ import {
   CCIP_DEFAULT_ROUTERS,
   CCIP_EXPLORER_BASE_URL,
   EVM_EXTRA_ARGS_V2_TAG,
+  GENERIC_EXTRA_ARGS_V3_TAG,
+  WAIT_FOR_FINALITY_FLAG,
   WHITECHAIN_CCIP_BRIDGE_ABI,
-  DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
   WHITECHAIN_USDT_ADDRESS,
   CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA,
   WHITECHAIN_SEPOLIA_CHAIN_ID,
@@ -63,9 +63,8 @@ export interface BuildWhitechainBridgeDepositParams {
   senderAddress: Address;
   nonce?: bigint;
   destChainSelector?: bigint;
-  signerPrivateKey?: Hex;
   signature?: Hex;
-  bridgeAddress?: Address;
+  bridgeAddress: Address;
   chainId?: bigint;
 }
 
@@ -103,6 +102,19 @@ export function encodeTokenOnlyExtraArgs(
 }
 
 /**
+ * Encodes the compact CCIP 2.0 GenericExtraArgsV3 token-only configuration.
+ * The default requests full finality and no destination callback.
+ */
+export function encodeTokenOnlyExtraArgsV3(gasLimit: number = 0): Hex {
+  if (!Number.isInteger(gasLimit) || gasLimit < 0 || gasLimit > 0xffffffff) {
+    throw new Error("gasLimit must be a uint32");
+  }
+
+  const gasLimitHex = gasLimit.toString(16).padStart(8, "0");
+  return `${GENERIC_EXTRA_ARGS_V3_TAG}${gasLimitHex}${WAIT_FOR_FINALITY_FLAG.slice(2)}00000000000000`;
+}
+
+/**
  * Encodes a receiver EOA address to CCIP receiver bytes: abi.encode(address)
  */
 export function encodeReceiverAddress(recipient: Address): Hex {
@@ -121,10 +133,10 @@ export function computeWhitechainDepositRawHash(params: {
   nonce: bigint;
   sender: Address;
   chainId?: bigint;
-  bridgeAddress?: Address;
+  bridgeAddress: Address;
 }): Hex {
   const chainId = params.chainId ?? BigInt(WHITECHAIN_SEPOLIA_CHAIN_ID);
-  const bridgeAddress = params.bridgeAddress ?? DEFAULT_WHITECHAIN_BRIDGE_ADDRESS;
+  const bridgeAddress = params.bridgeAddress;
 
   return keccak256(
     encodeAbiParameters(
@@ -155,7 +167,7 @@ export function computeWhitechainDepositHash(params: {
   nonce: bigint;
   sender: Address;
   chainId?: bigint;
-  bridgeAddress?: Address;
+  bridgeAddress: Address;
 }): Hex {
   const rawHash = computeWhitechainDepositRawHash(params);
   return hashMessage({ raw: toBytes(rawHash) });
@@ -163,7 +175,8 @@ export function computeWhitechainDepositHash(params: {
 
 /**
  * Builds the unsigned transactions for approving tokens and calling bridgeTokens on WhitechainCCIPBridge.
- * Optionally signs the deposit voucher if signerPrivateKey is provided.
+ * The optional voucher signature must be produced by the configured signer
+ * outside this adapter. This package never accepts signing material.
  */
 export async function buildWhitechainBridgeDeposit(
   params: BuildWhitechainBridgeDepositParams
@@ -185,7 +198,7 @@ export async function buildWhitechainBridgeDeposit(
   const token = getAddress(rawToken);
   const recipientAddress = getAddress(params.recipientAddress);
   const senderAddress = getAddress(params.senderAddress);
-  const bridgeAddress = getAddress(params.bridgeAddress ?? DEFAULT_WHITECHAIN_BRIDGE_ADDRESS);
+  const bridgeAddress = getAddress(params.bridgeAddress);
   const destChainSelector = params.destChainSelector ?? CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA;
   const nonce = params.nonce ?? 0n;
   const chainId = params.chainId ?? BigInt(WHITECHAIN_SEPOLIA_CHAIN_ID);
@@ -203,13 +216,7 @@ export async function buildWhitechainBridgeDeposit(
 
   const depositId = hashMessage({ raw: toBytes(rawHash) });
 
-  let signature: Hex = params.signature ?? "0x";
-  if (params.signerPrivateKey) {
-    const account = privateKeyToAccount(params.signerPrivateKey);
-    signature = await account.signMessage({
-      message: { raw: toBytes(rawHash) },
-    });
-  }
+  const signature: Hex = params.signature ?? "0x";
 
   const approvalData = encodeFunctionData({
     abi: ERC20_ABI,
@@ -310,7 +317,7 @@ export class CCIPBridgeAdapter {
         },
       ],
       feeToken: params.feeToken ?? ZERO_ADDRESS,
-      extraArgs: encodeTokenOnlyExtraArgs(0n, true), // gasLimit = 0
+      extraArgs: encodeTokenOnlyExtraArgsV3(), // token-only, full finality
     };
   }
 
@@ -452,30 +459,23 @@ export class CCIPBridgeAdapter {
   }
 
   /**
-   * Bridges Whitechain USDT to Ethereum Sepolia via WhitechainCCIPBridge (whitechain-labs/bridge-contracts reference).
-   * First-class SDK operation returning prepared approval and bridgeTokens payload with cryptographic voucher.
+   * This proposed custom Whitechain flow is intentionally disabled. Whitechain
+   * is not a configured CCIP source and the repository has no destination
+   * settlement transport for these deposits.
    */
   public async bridgeWhitechainUsdtToSepolia(params: {
     amountUnits: bigint;
     recipientAddress: Address;
     senderAddress: Address;
     tokenAddress?: Address;
-    signerPrivateKey?: Hex;
     signature?: Hex;
-    bridgeAddress?: Address;
+    bridgeAddress: Address;
     nonce?: bigint;
   }): Promise<WhitechainBridgeDepositPayload> {
-    return buildWhitechainBridgeDeposit({
-      tokenAddress: params.tokenAddress ?? WHITECHAIN_USDT_ADDRESS,
-      amountUnits: params.amountUnits,
-      recipientAddress: params.recipientAddress,
-      senderAddress: params.senderAddress,
-      destChainSelector: CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA,
-      nonce: params.nonce,
-      signerPrivateKey: params.signerPrivateKey,
-      signature: params.signature,
-      bridgeAddress: params.bridgeAddress,
-    });
+    void params;
+    throw new Error(
+      "Whitechain to Sepolia bridging is disabled until a destination settlement contract and relayer are implemented"
+    );
   }
 
   /**

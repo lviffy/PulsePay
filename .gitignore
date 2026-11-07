@@ -73,3 +73,5 @@ Thumbs.db
 # Web development output
 .next-dev/
 .svelte-kit/
+.vercel
+.env*

@@ -1,0 +1,33 @@
+flowchart TB
+    Merchant["Merchant"] --> Dashboard["Merchant dashboard · SvelteKit"]
+    Customer["Customer wallet"] --> Checkout["Checkout · Web / React SDK"]
+    Agent["AI agent"] --> Worker["Agent worker · Spend policy and recovery"]
+    Developer["Application developer"] --> SDK["Core SDK · Whitechain and CCIP adapters"]
+
+    Dashboard --> SDK
+    Checkout --> SDK
+    Dashboard -->|Service and audit reads| API["Payment API · Discovery, HTTP 402 and receipt checks"]
+    Worker <-->|Request, challenge, payment proof, response| API
+    Worker --> HederaAdapter["Hedera adapter · Agent Kit tools and audit hook"]
+
+    subgraph Networks["Settlement and audit"]
+        WhitechainHub["Whitechain merchant hub · USDT billing"]
+        HBAR["Hedera · Native HBAR transfers"]
+        Mirror["Hedera Mirror Node · Receipt and topic reads"]
+        HCS["Hedera Consensus Service · Audit records"]
+        HederaHub["Hedera EVM merchant hub · Token invoices and HSS renewals"]
+        CCIP["Chainlink CCIP · Routers and token pools"]
+        Recipient["Destination wallet"]
+    end
+
+    SDK -->|Wallet-authorized billing transactions| WhitechainHub
+    SDK -->|Wallet-authorized token transfers| CCIP
+    CCIP --> Recipient
+    HederaAdapter --> HBAR
+    HederaAdapter --> HCS
+    HederaAdapter --> HederaHub
+    API -->|Verify native payments| Mirror
+    API -->|Verify token invoices| HederaHub
+    Dashboard -->|Read audit history| Mirror
+    Worker --> State["Persistent worker state · Purchases, budgets and audit retries"]
+    API --> APIState["Persistent API state · Challenges and saved responses"]

@@ -16,7 +16,7 @@ For example, an application prepares a transfer from Ethereum Sepolia to Hedera 
 | Token validation | Before quoting, the adapter checks the source token’s registered pool, the pool’s destination support, and a nonzero destination-token mapping. Lane availability alone does not establish token support. |
 | Fee quotes | `quoteBridgeFee` calls the source router’s `getFee` using the actual transfer message. Missing RPC configuration or failed reads return errors. |
 | Transfer preparation | `buildBridgeTransactions` returns unsigned token approval and `ccipSend` payloads. Native fees are the default; an ERC-20 fee token can require a separate approval or a combined allowance when it is also the transferred token. |
-| Direct token delivery | Messages use an ABI-encoded recipient address, empty `data`, and `gasLimit = 0`. PulsePay does not request a destination contract callback. |
+| Direct token delivery | Messages use an ABI-encoded recipient address, empty `data`, and CCIP 2.0 GenericExtraArgsV3 with `gasLimit = 0` and full finality. PulsePay does not request a destination contract callback. |
 | Delivery monitoring | `CCIPMessageMonitor` queries Chainlink’s public message API. The core SDK exposes status lookup and polling with cancellation and timeout controls. |
 | Merchant visibility | `/merchant/treasury` displays live lane configuration through `/api/treasury` and links to CCIP Explorer. It does not submit bridge transactions. |
 
@@ -38,6 +38,8 @@ The adapter’s built-in router and selector maps cover **Ethereum Sepolia** (ch
 CCIP selectors are different from EVM chain IDs. For example, the repo maps Hedera Testnet to selector `222782988166878823`, matching the official [Hedera Testnet directory](https://docs.chain.link/ccip/directory/testnet/chain/hedera-testnet). The official [Ethereum Sepolia directory](https://docs.chain.link/ccip/directory/testnet/chain/ethereum-testnet-sepolia) lists its router and selector. Use the [CCIP testnet directory](https://docs.chain.link/ccip/directory/testnet) to confirm current network and token support.
 
 The transfer token must exist on the source chain and be supported for the selected destination. Whitechain’s USDT settlement address is not automatically a valid bridge token on Sepolia or Hedera. Amounts use the selected token’s actual decimals.
+
+Whitechain-to-Sepolia bridging is disabled. Whitechain is not configured as a direct CCIP source, the repository's recorded bridge and mapper addresses are not deployed, and no destination settlement relayer is implemented. `scripts/bridge-whitechain-to-sepolia.mjs` is therefore a read-only deployment diagnostic that exits with an error.
 
 ## Where to find the code
 

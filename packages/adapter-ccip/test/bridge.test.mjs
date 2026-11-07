@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   CCIPBridgeAdapter,
   encodeTokenOnlyExtraArgs,
+  encodeTokenOnlyExtraArgsV3,
   encodeReceiverAddress,
   ZERO_ADDRESS,
 } from "../dist/index.js";
@@ -10,13 +11,24 @@ import {
   CCIP_CHAIN_SELECTORS,
   CCIP_DEFAULT_ROUTERS,
   CCIP_EXPLORER_BASE_URL,
+  DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
   EVM_EXTRA_ARGS_V2_TAG,
+  GENERIC_EXTRA_ARGS_V3_TAG,
+  WAIT_FOR_FINALITY_FLAG,
 } from "../dist/constants.js";
 
 test("encodeTokenOnlyExtraArgs encodes gasLimit = 0 and allowOutOfOrderExecution = true", () => {
   const extraArgs = encodeTokenOnlyExtraArgs(0n, true);
   assert.ok(extraArgs.startsWith(EVM_EXTRA_ARGS_V2_TAG));
   assert.equal(extraArgs.length, 10 + 64 + 64); // 4-byte tag (10 chars with 0x) + uint256 (64 chars) + bool (64 chars)
+});
+
+test("encodeTokenOnlyExtraArgsV3 encodes token-only full-finality CCIP 2.0 args", () => {
+  const extraArgs = encodeTokenOnlyExtraArgsV3();
+  assert.equal(extraArgs, `${GENERIC_EXTRA_ARGS_V3_TAG}00000000${WAIT_FOR_FINALITY_FLAG.slice(2)}00000000000000`);
+  assert.equal(extraArgs.length, 40); // 0x + 19 bytes
+  assert.throws(() => encodeTokenOnlyExtraArgsV3(-1), /uint32/);
+  assert.throws(() => encodeTokenOnlyExtraArgsV3(0x1_0000_0000), /uint32/);
 });
 
 test("encodeReceiverAddress encodes standard 20-byte address to 32-byte ABI word", () => {
@@ -139,22 +151,22 @@ test("token pools must be registered, connected and have a destination token", a
   }
 });
 
-test("buildWhitechainBridgeDeposit builds valid approval and bridgeTokens calldata with signature", async () => {
-  const { buildWhitechainBridgeDeposit, computeWhitechainDepositHash } = await import("../dist/index.js");
-  const { decodeFunctionData, recoverAddress } = await import("viem");
+test("buildWhitechainBridgeDeposit builds valid approval and bridgeTokens calldata with an external signature", async () => {
+  const { buildWhitechainBridgeDeposit } = await import("../dist/index.js");
+  const { decodeFunctionData } = await import("viem");
   const { WHITECHAIN_CCIP_BRIDGE_ABI, ERC20_ABI, DEFAULT_WHITECHAIN_BRIDGE_ADDRESS, WHITECHAIN_USDT_ADDRESS, CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA } = await import("../dist/constants.js");
 
-  const signerPk = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-  const expectedSigner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
   const sender = "0x1111111111111111111111111111111111111111";
   const recipient = "0x2222222222222222222222222222222222222222";
   const amount = 500_000000n; // 500 USDT
+  const signature = `0x${"11".repeat(65)}`;
 
   const payload = await buildWhitechainBridgeDeposit({
     senderAddress: sender,
     recipientAddress: recipient,
     amountUnits: amount,
-    signerPrivateKey: signerPk,
+    signature,
+    bridgeAddress: DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
   });
 
   assert.equal(payload.approvalTx.to.toLowerCase(), WHITECHAIN_USDT_ADDRESS.toLowerCase());
@@ -173,12 +185,7 @@ test("buildWhitechainBridgeDeposit builds valid approval and bridgeTokens callda
   assert.equal(decodedBridge.args[4], 0n);
   assert.equal(decodedBridge.args[5], payload.signature);
 
-  // Verify signature recovery
-  const recovered = await recoverAddress({
-    hash: payload.depositId,
-    signature: payload.signature,
-  });
-  assert.equal(recovered.toLowerCase(), expectedSigner.toLowerCase());
+  assert.equal(payload.signature, signature);
 });
 
 test("buildWhitechainBridgeDeposit validates input parameters", async () => {
@@ -188,6 +195,7 @@ test("buildWhitechainBridgeDeposit validates input parameters", async () => {
       senderAddress: ZERO_ADDRESS,
       recipientAddress: "0x2222222222222222222222222222222222222222",
       amountUnits: 100n,
+      bridgeAddress: DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
     }),
     /Invalid senderAddress/
   );
@@ -196,6 +204,7 @@ test("buildWhitechainBridgeDeposit validates input parameters", async () => {
       senderAddress: "0x1111111111111111111111111111111111111111",
       recipientAddress: ZERO_ADDRESS,
       amountUnits: 100n,
+      bridgeAddress: DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
     }),
     /Invalid recipientAddress/
   );
@@ -204,7 +213,21 @@ test("buildWhitechainBridgeDeposit validates input parameters", async () => {
       senderAddress: "0x1111111111111111111111111111111111111111",
       recipientAddress: "0x2222222222222222222222222222222222222222",
       amountUnits: 0n,
+      bridgeAddress: DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
     }),
     /amountUnits must be greater than 0/
+  );
+});
+
+test("Whitechain to Sepolia bridge operation fails closed", async () => {
+  const adapter = new CCIPBridgeAdapter();
+  await assert.rejects(
+    adapter.bridgeWhitechainUsdtToSepolia({
+      senderAddress: "0x1111111111111111111111111111111111111111",
+      recipientAddress: "0x2222222222222222222222222222222222222222",
+      amountUnits: 100n,
+      bridgeAddress: DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
+    }),
+    /disabled/
   );
 });

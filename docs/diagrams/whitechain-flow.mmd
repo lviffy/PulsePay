@@ -1,0 +1,8 @@
+flowchart LR
+    Merchant["Merchant"] -->|Create invoice| Hub["PulsePayMerchantHub"]
+    Customer["Customer wallet"] -->|Approve and pay USDT| Hub
+    Hub --> Reserve["Refund reserve"]
+    Hub --> Proceeds["Available proceeds"]
+    Reserve -->|Refund first| Payer["Original payer"]
+    Proceeds -->|Refund remainder| Payer
+    Proceeds -->|Withdraw| MerchantWallet["Merchant wallet"]

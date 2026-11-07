@@ -1,60 +1,12 @@
-# Chainlink CCIP Token Bridging & Whitechain Bridge
+# Chainlink CCIP Token Bridging
 
-PulsePay supports live lane checks, token-pool checks, router fee quotes, unsigned transfer preparation, message monitoring, and Whitechain USDT cross-chain bridging to Ethereum Sepolia. These operations are exposed by `@pulsepay/adapter-ccip`, `@pulsepay/adapter-whitechain`, and `PulsePayClient.bridgeOps`.
+PulsePay supports live lane checks, token-pool checks, router fee quotes, unsigned transfer preparation, and message monitoring through `@pulsepay/adapter-ccip` and `PulsePayClient.bridgeOps`.
 
-## Whitechain USDT to Ethereum Sepolia Bridge
+The configured demonstration route is Ethereum Sepolia to Hedera Testnet. Token-only messages use CCIP 2.0 GenericExtraArgsV3, full finality, empty data, and zero destination callback gas.
 
-PulsePay integrates **Whitechain USDT** (`0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7` on Whitechain Sepolia, Chain ID `1874`) to **Ethereum Sepolia** (Chain ID `11155111`, CCIP Chain Selector `16015286601757825753`) using the canonical dual-contract architecture adapted from [`whitechain-labs/bridge-contracts`](https://github.com/whitechain-labs/bridge-contracts):
+## Whitechain status
 
-1. **`WhitechainBridgeMapper`**:
-   - Manages token registry mappings between Whitechain and destination chains (`16015286601757825753`).
-   - Configures `LOCK_RELEASE` / `BURN_MINT` transfer types, min/max transfer bounds (10 USDT to 5,000 USDT), and daily rolling volume limits (20,000 USDT).
-   - Authorizes trusted bridge contracts to record and debit volume allowances.
-
-2. **`WhitechainCCIPBridge`**:
-   - User deposit entrypoint `bridgeTokens(token, amount, destChainSelector, recipient, nonce, signature)`.
-   - Pulls user tokens via `SafeERC20.safeTransferFrom` into escrow/custody.
-   - Enforces cryptographic backend/validator signature verification (EIP-712 / ECDSA) and anti-replay protection (`usedHashes[depositId] = true`).
-   - Emits canonical `Deposit` event containing `depositId`, `token`, `sender`, `recipient`, `amount`, and `destChainSelector`.
-
-### SDK Usage
-
-Bridge Whitechain USDT directly with `@pulsepay/sdk-core` or `@pulsepay/adapter-ccip`:
-
-```typescript
-import { buildWhitechainBridgeDeposit, WHITECHAIN_USDT_ADDRESS } from "@pulsepay/adapter-ccip";
-import { parseUnits } from "viem";
-
-const payload = await buildWhitechainBridgeDeposit({
-  tokenAddress: WHITECHAIN_USDT_ADDRESS,
-  amountUnits: parseUnits("100", 6), // 100 USDT
-  recipientAddress: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-  senderAddress: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  nonce: 0n,
-  signerPrivateKey: process.env.BRIDGE_SIGNER_KEY, // optional backend voucher
-});
-
-// 1. Submit approval transaction: payload.approvalTx
-// 2. Submit bridge transaction: payload.bridgeTx
-```
-
-Or using `PulsePayClient`:
-
-```typescript
-const deposit = await client.bridge.bridgeWhitechainUsdtToSepolia({
-  amountUnits: parseUnits("100", 6),
-  recipientAddress: "0xRecipient...",
-  senderAddress: "0xSender...",
-});
-```
-
-### Runnable CLI Script
-
-Run the end-to-end testnet bridging script:
-
-```bash
-node scripts/bridge-whitechain-to-sepolia.mjs 100 0xRecipient... 0xSender...
-```
+Whitechain-to-Sepolia bridging is disabled. Whitechain is not configured as a direct CCIP source, the recorded bridge and mapper addresses are not deployed, and the repository contains no destination settlement relayer. The Whitechain script performs read-only deployment checks and exits with an error; it never prepares or simulates a successful transfer.
 
 ---
 

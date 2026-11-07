@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant Agent as AI agent
+    participant API as Paid API
+    participant Policy as Spend policy
+    participant Hedera as Hedera
+    participant Mirror as Mirror Node
+    participant HCS as HCS audit
+
+    Agent->>API: Request resource
+    API-->>Agent: HTTP 402 challenge
+    Agent->>Policy: Check merchant and budget
+    Policy-->>Agent: Approved
+    Agent->>Hedera: Pay native HBAR
+    Agent->>API: Retry with payment evidence
+    API->>Mirror: Verify receipt and challenge binding
+    Mirror-->>API: Valid payment
+    API-->>Agent: Purchased response
+    Agent->>HCS: Record activity

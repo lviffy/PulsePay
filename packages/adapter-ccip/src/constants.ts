@@ -38,7 +38,6 @@ export const CCIP_CHAIN_SELECTORS: Record<number, bigint> = {
   11155111: 16015286601757825753n, // Ethereum Sepolia
   296: 222782988166878823n,        // Hedera Testnet
   421614: 3478487238524512106n,    // Arbitrum Sepolia
-  1874: 16015286601757825753n,      // Whitechain Sepolia -> Ethereum Sepolia CCIP 2.0 selector
 };
 
 export const CCIP_DEFAULT_ROUTERS: Record<number, `0x${string}`> = {
@@ -49,6 +48,10 @@ export const CCIP_DEFAULT_ROUTERS: Record<number, `0x${string}`> = {
 
 // EVMExtraArgsV2 tag = 0x181dcf10: keccak256("CCIP EVMExtraArgsV2")[0:4]
 export const EVM_EXTRA_ARGS_V2_TAG = "0x181dcf10" as const;
+
+// CCIP 2.0 GenericExtraArgsV3 compact encoding constants.
+export const GENERIC_EXTRA_ARGS_V3_TAG = "0xa69dd4aa" as const;
+export const WAIT_FOR_FINALITY_FLAG = "0x00000000" as const;
 
 export const CCIP_ONRAMP_ABI = parseAbi([
   "function getPoolBySourceToken(uint64 destChainSelector, address sourceToken) external view returns (address)",
