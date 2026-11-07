@@ -25,7 +25,7 @@ Transfer limits exclude network and HCS fees. HEDERA_MAX_FEE_TINYBARS and HEDERA
 | `PulsePaySpendLimitPolicy` | Agent Kit policy hooks |
 | `SpendPolicyConfig` | Tool allowlist, merchant allowlist and transfer limits |
 
-Source: [packages/adapter-hedera/src/policy/PulsePaySpendLimitPolicy.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/adapter-hedera/src/policy/PulsePaySpendLimitPolicy.ts).
+Source: [packages/adapter-hedera/src/policy/PulsePaySpendLimitPolicy.ts](https://github.com/lviffy/PulsePay/blob/main/packages/adapter-hedera/src/policy/PulsePaySpendLimitPolicy.ts).
 
 ## 05 / Verification
 

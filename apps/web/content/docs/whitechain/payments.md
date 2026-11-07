@@ -26,7 +26,7 @@ getPayment returns amountPaidUnits, amountRefundedUnits, status and transaction 
 | `WhitechainAdapter.getPayment` | Reads cumulative payment and refund amounts |
 | `PulsePayCheckout` | Renders invoice reads and confirmed settlement |
 
-Source: [packages/adapter-whitechain/src/client.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/adapter-whitechain/src/client.ts).
+Source: [packages/adapter-whitechain/src/client.ts](https://github.com/lviffy/PulsePay/blob/main/packages/adapter-whitechain/src/client.ts).
 
 ## 05 / Verification
 

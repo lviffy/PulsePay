@@ -37,7 +37,7 @@ Amounts use bigint in base units. The web API serializes these values as integer
 | `PulsePayClient.payments` | refund, withdraw, fundReserve and balances |
 | `PulsePayClient.subscriptions` | Plans, subscriptions, renewals and cancellation |
 
-Source: [packages/sdk-core/src/index.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/sdk-core/src/index.ts).
+Source: [packages/sdk-core/src/index.ts](https://github.com/lviffy/PulsePay/blob/main/packages/sdk-core/src/index.ts).
 
 ## 05 / Verification
 

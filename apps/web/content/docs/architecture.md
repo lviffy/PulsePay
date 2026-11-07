@@ -27,7 +27,7 @@ One server and one worker may own their file-backed stores. Keep PULSEPAY_STATE_
 | `CCIPBridgeAdapter` | Chainlink CCIP 2.0 token bridging client |
 | `PulsePayHederaPlugin` | Agent Kit tools with spend policy and audit hooks |
 
-Source: [README.md](https://github.com/lviffy/ETHGLOBAL/blob/main/README.md).
+Source: [README.md](https://github.com/lviffy/PulsePay/blob/main/README.md).
 
 ## 05 / Verification
 

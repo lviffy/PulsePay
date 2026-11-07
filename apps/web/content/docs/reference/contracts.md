@@ -24,7 +24,7 @@ Hedera integration is TypeScript and native HBAR; no custom Hedera Solidity cont
 | --- | --- |
 | `PulsePayMerchantHub` | Whitechain invoice, refund and subscription ledger |
 
-Source: [contracts/whitechain/src/PulsePayMerchantHub.sol](https://github.com/lviffy/ETHGLOBAL/blob/main/contracts/whitechain/src/PulsePayMerchantHub.sol).
+Source: [contracts/whitechain/src/PulsePayMerchantHub.sol](https://github.com/lviffy/PulsePay/blob/main/contracts/whitechain/src/PulsePayMerchantHub.sol).
 
 ## 05 / Verification
 

@@ -223,8 +223,8 @@ npm install @pulsepay/adapter-hedera @hashgraph/hedera-agent-kit @hiero-ledger/s
 Use **Node.js ≥22.13.0** and **pnpm 12.14.0**.
 
 ```bash
-git clone https://github.com/lviffy/ETHGLOBAL.git
-cd ETHGLOBAL
+git clone https://github.com/lviffy/PulsePay.git
+cd PulsePay
 pnpm install --frozen-lockfile
 cp .env.example .env
 ```

@@ -46,7 +46,7 @@ The service returns sample orderbook data. It is not a live market feed. Network
 | `handleX402PaymentCheck` | Issues challenges and independently verifies proof |
 | `X402PayTool` | Journals a transfer and redeems its receipt |
 
-Source: [packages/sdk-server/src/x402.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/sdk-server/src/x402.ts).
+Source: [packages/sdk-server/src/x402.ts](https://github.com/lviffy/PulsePay/blob/main/packages/sdk-server/src/x402.ts).
 
 ## 06 / Verification
 

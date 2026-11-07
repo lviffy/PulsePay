@@ -26,7 +26,7 @@ Wallet rejection leaves the write unconfirmed. A mined transaction with receipt.
 | `HederaMirrorClient` | Rejects unindexed or unsuccessful receipts |
 | `handleX402PaymentCheck` | Returns status-specific protocol failures |
 
-Source: [packages/adapter-whitechain/src/client.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/adapter-whitechain/src/client.ts).
+Source: [packages/adapter-whitechain/src/client.ts](https://github.com/lviffy/PulsePay/blob/main/packages/adapter-whitechain/src/client.ts).
 
 ## 05 / Verification
 

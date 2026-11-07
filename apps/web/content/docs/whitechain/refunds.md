@@ -27,7 +27,7 @@ The reserve belongs to the merchant. A reason string is hashed with keccak256 by
 | `WhitechainAdapter.fundRefundReserve` | Approves and deposits additional reserve USDT |
 | `PulsePayMerchantHub.issueRefund` | Enforces merchant, reserve and refundable remainder |
 
-Source: [packages/adapter-whitechain/src/client.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/adapter-whitechain/src/client.ts).
+Source: [packages/adapter-whitechain/src/client.ts](https://github.com/lviffy/PulsePay/blob/main/packages/adapter-whitechain/src/client.ts).
 
 ## 05 / Verification
 

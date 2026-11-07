@@ -27,7 +27,7 @@ getInvoice, getPayment, getSubscription and getPlan expose the authoritative rec
 | `getMerchantBalances` | Reads reserve and available USDT |
 | `getMerchantReserveBps` | Reads the effective merchant reserve policy |
 
-Source: [contracts/whitechain/src/PulsePayMerchantHub.sol](https://github.com/lviffy/ETHGLOBAL/blob/main/contracts/whitechain/src/PulsePayMerchantHub.sol).
+Source: [contracts/whitechain/src/PulsePayMerchantHub.sol](https://github.com/lviffy/PulsePay/blob/main/contracts/whitechain/src/PulsePayMerchantHub.sol).
 
 ## 05 / Verification
 

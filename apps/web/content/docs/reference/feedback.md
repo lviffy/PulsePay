@@ -27,7 +27,7 @@ Report the exact route and action, expected behavior, chain ID and a public tran
 | `WHITECHAIN_FEEDBACK.md` | Whitechain integration findings |
 | `FEEDBACK.md` | Chainlink CCIP integration findings |
 
-Source: [docs/VERIFICATION.md](https://github.com/lviffy/ETHGLOBAL/blob/main/docs/VERIFICATION.md).
+Source: [docs/VERIFICATION.md](https://github.com/lviffy/PulsePay/blob/main/docs/VERIFICATION.md).
 
 ## 05 / Verification
 

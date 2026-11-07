@@ -1144,7 +1144,7 @@
 						id="action-reason-input"
 						bind:value={reason}
 						rows="3"
-						style="width: 100%; background: transparent; border: 1px solid #747466; color: var(--cream); padding: 13px;"
+						style="width: 100%; background: transparent; border: 1px solid #747466; color: var(--ink); padding: 13px; font-family: var(--mono);"
 					></textarea>
 				{/if}
 
@@ -1167,7 +1167,7 @@
 					/>
 				{/if}
 
-				<button type="submit" class="button light" style="margin-top: 22px;">
+				<button type="submit" class="button" style="margin-top: 22px;">
 					Review transaction →
 				</button>
 			</form>
@@ -1186,11 +1186,11 @@
 				A transaction is submitted only after you confirm it in your wallet. Wait for the chain receipt.
 			</p>
 			<div class="actions" style="margin-top: 20px;">
-				<button class="button light" onclick={executeConfirm} disabled={busy}>
+				<button class="button" onclick={executeConfirm} disabled={busy}>
 					{busy ? 'Awaiting confirmation…' : confirm?.label}
 				</button>
 				<button
-					class="button outline-light"
+					class="button soft"
 					onclick={() => (!busy ? (confirm = null) : null)}
 					disabled={busy}
 				>

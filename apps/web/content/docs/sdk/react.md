@@ -36,7 +36,7 @@ PulsePayReceipt renders evidence supplied by the application; it does not indepe
 | `PulsePayCheckout` | Reads invoice and executes direct USDT payment |
 | `PulsePayReceipt` | Displays supplied verified payment evidence |
 
-Source: [packages/sdk-react/src/checkout.tsx](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/sdk-react/src/checkout.tsx).
+Source: [packages/sdk-react/src/checkout.tsx](https://github.com/lviffy/PulsePay/blob/main/packages/sdk-react/src/checkout.tsx).
 
 ## 05 / Verification
 

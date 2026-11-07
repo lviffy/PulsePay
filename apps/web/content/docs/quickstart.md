@@ -39,7 +39,7 @@ The web app listens on port 3100. The separate demo API uses port 3000. For Hede
 | `PulsePayProvider` | Provides the configured unified client |
 | `PulsePayCheckout` | Reads an invoice, requests wallet authorization and verifies settlement |
 
-Source: [README.md](https://github.com/lviffy/ETHGLOBAL/blob/main/README.md).
+Source: [README.md](https://github.com/lviffy/PulsePay/blob/main/README.md).
 
 ## 05 / Verification
 

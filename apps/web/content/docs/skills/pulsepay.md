@@ -19,26 +19,26 @@ Install this skill into your AI coding tool with one command:
 
 ```bash
 # Universal (Auto-detects Cursor, Claude Code, Windsurf, Copilot, Antigravity)
-npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay
+npx skills add https://github.com/lviffy/PulsePay --skill pulsepay
 ```
 
 ### Tool-Specific Commands
 
 ```bash
 # Claude Code (.claude/skills)
-npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a claude-code
+npx skills add https://github.com/lviffy/PulsePay --skill pulsepay -a claude-code
 
 # Cursor (.cursor/skills)
-npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a cursor
+npx skills add https://github.com/lviffy/PulsePay --skill pulsepay -a cursor
 
 # Windsurf (.windsurf/skills)
-npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a windsurf
+npx skills add https://github.com/lviffy/PulsePay --skill pulsepay -a windsurf
 
 # Antigravity (.agents/skills)
-npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a antigravity
+npx skills add https://github.com/lviffy/PulsePay --skill pulsepay -a antigravity
 
 # GitHub Copilot (.github/skills)
-npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a copilot
+npx skills add https://github.com/lviffy/PulsePay --skill pulsepay -a copilot
 ```
 
 ---

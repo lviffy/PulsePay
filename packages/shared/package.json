@@ -16,13 +16,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/lviffy/ETHGLOBAL.git",
+    "url": "https://github.com/lviffy/PulsePay.git",
     "directory": "packages/shared"
   },
   "bugs": {
-    "url": "https://github.com/lviffy/ETHGLOBAL/issues"
+    "url": "https://github.com/lviffy/PulsePay/issues"
   },
-  "homepage": "https://github.com/lviffy/ETHGLOBAL#readme",
+  "homepage": "https://github.com/lviffy/PulsePay#readme",
   "scripts": {
     "build": "tsc",
     "lint": "eslint src"

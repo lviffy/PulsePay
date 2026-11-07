@@ -27,7 +27,7 @@ Set PULSEPAY_MERCHANT_ADDRESS and optional PULSEPAY_MERCHANT_NAME for the consol
 | `HEDERA_AUDIT_TOPIC_ID` | Worker consensus topic |
 | `PULSEPAY_STATE_DIRECTORY` | Persistent private state path |
 
-Source: [.env.example](https://github.com/lviffy/ETHGLOBAL/blob/main/.env.example).
+Source: [.env.example](https://github.com/lviffy/PulsePay/blob/main/.env.example).
 
 ## 05 / Verification
 

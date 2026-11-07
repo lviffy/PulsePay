@@ -29,7 +29,7 @@
 <dialog
 	bind:this={dialog}
 	class="palette"
-	style="padding: 24px; max-width: 600px;"
+	style="padding: 24px; max-width: 600px; color-scheme: light; color: var(--ink);"
 	oncancel={() => onclose?.()}
 	onclick={handleBackdrop}
 >

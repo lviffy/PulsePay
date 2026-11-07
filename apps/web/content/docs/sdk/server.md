@@ -36,7 +36,7 @@ Keep challenges.json private and durable. Public receipts and accounting exports
 | `handleX402PaymentCheck` | Challenge issuance, receipt verification and durable redemption |
 | `getVerifiedHederaPayments` | Reads redeemed payments without challenge secrets |
 
-Source: [packages/sdk-server/src/x402.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/sdk-server/src/x402.ts).
+Source: [packages/sdk-server/src/x402.ts](https://github.com/lviffy/PulsePay/blob/main/packages/sdk-server/src/x402.ts).
 
 ## 05 / Verification
 

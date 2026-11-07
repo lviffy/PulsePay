@@ -35,7 +35,7 @@ The frontend uses adapter reads after discovering real creation events. A failed
 | `WhitechainAdapter.getInvoice` | Reads a current invoice or null |
 | `WhitechainAdapter.cancelInvoice` | Cancels an open invoice |
 
-Source: [packages/adapter-whitechain/src/client.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/adapter-whitechain/src/client.ts).
+Source: [packages/adapter-whitechain/src/client.ts](https://github.com/lviffy/PulsePay/blob/main/packages/adapter-whitechain/src/client.ts).
 
 ## 05 / Verification
 

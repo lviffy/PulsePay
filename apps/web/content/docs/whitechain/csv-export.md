@@ -26,7 +26,7 @@ An export is scoped to the displayed event window. Load an older window to expor
 | `formatAccountantCsv` | Formats NormalizedActivity into the shared twelve-column CSV |
 | `NormalizedActivity` | Defines asset, event, raw units, counterparties and evidence |
 
-Source: [packages/shared/src/csv.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/shared/src/csv.ts).
+Source: [packages/shared/src/csv.ts](https://github.com/lviffy/PulsePay/blob/main/packages/shared/src/csv.ts).
 
 ## 05 / Verification
 

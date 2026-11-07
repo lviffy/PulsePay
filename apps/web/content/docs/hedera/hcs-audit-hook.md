@@ -26,7 +26,7 @@ The Hedera tab in /merchant reads topic messages directly from the mirror node, 
 | `PulsePayHcsAuditHook.retryPending` | Reconciles saved transactions before resubmission |
 | `HederaMirrorClient.verifyTopicMessage` | Checks the exact public payload |
 
-Source: [packages/adapter-hedera/src/hooks/PulsePayHcsAuditHook.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/adapter-hedera/src/hooks/PulsePayHcsAuditHook.ts).
+Source: [packages/adapter-hedera/src/hooks/PulsePayHcsAuditHook.ts](https://github.com/lviffy/PulsePay/blob/main/packages/adapter-hedera/src/hooks/PulsePayHcsAuditHook.ts).
 
 ## 05 / Verification
 

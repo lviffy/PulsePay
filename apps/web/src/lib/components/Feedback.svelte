@@ -16,7 +16,7 @@
 	<button class="copy-button" onclick={handleYes}>Yes</button>
 	<a
 		class="copy-button"
-		href="https://github.com/lviffy/ETHGLOBAL/issues/new?title={encodeURIComponent(`Docs feedback: ${slug}`)}"
+		href="https://github.com/lviffy/PulsePay/issues/new?title={encodeURIComponent(`Docs feedback: ${slug}`)}"
 		target="_blank"
 		rel="noreferrer"
 	>

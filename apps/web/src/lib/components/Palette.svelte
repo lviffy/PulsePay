@@ -58,6 +58,7 @@
 <dialog
 	bind:this={dialog}
 	class="palette"
+	style="color-scheme: light; color: var(--ink);"
 	oncancel={onclose}
 	onclick={handleBackdropClick}
 	onkeydown={handleKeyDown}
@@ -74,9 +75,11 @@
 		placeholder="Type to search…"
 		autocomplete="off"
 		role="combobox"
+		aria-controls="palette-listbox"
 		aria-expanded="true"
+		style="color: var(--ink);"
 	/>
-	<div role="listbox" data-lenis-prevent>
+	<div id="palette-listbox" role="listbox" data-lenis-prevent>
 		{#if open}
 			{#each filtered as item, i (item.value)}
 				<button

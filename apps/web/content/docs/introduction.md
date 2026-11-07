@@ -49,7 +49,7 @@ Read README.md before configuring a deployment. Start with direct USDT checkout 
 | --- | --- |
 | `PulsePayClient` | Unified SDK entry point; whitechain and CCIP bridge adapters |
 
-Source: [README.md](https://github.com/lviffy/ETHGLOBAL/blob/main/README.md).
+Source: [README.md](https://github.com/lviffy/PulsePay/blob/main/README.md).
 
 ## 06 / Verification
 

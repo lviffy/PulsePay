@@ -35,7 +35,7 @@ Do not treat unsigned transaction bytes as settlement. Refund tools reject same-
 | `X402PayTool` | Native receipt payment lifecycle |
 | `IssueRefundTool` | Verifies the original receipt and refundable remainder |
 
-Source: [packages/adapter-hedera/src/plugin.ts](https://github.com/lviffy/ETHGLOBAL/blob/main/packages/adapter-hedera/src/plugin.ts).
+Source: [packages/adapter-hedera/src/plugin.ts](https://github.com/lviffy/PulsePay/blob/main/packages/adapter-hedera/src/plugin.ts).
 
 ## 05 / Verification
 

@@ -11,42 +11,42 @@
 		{
 			id: 'universal',
 			label: 'Universal (npx skills)',
-			command: 'npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay',
+			command: 'npx skills add https://github.com/lviffy/PulsePay --skill pulsepay',
 			targetDir: 'Auto-detects active agent (.agents, .claude, .cursor)',
 			note: 'Universal installer. Detects your coding tool and places the skill in the appropriate directory.'
 		},
 		{
 			id: 'claude',
 			label: 'Claude Code',
-			command: 'npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a claude-code',
+			command: 'npx skills add https://github.com/lviffy/PulsePay --skill pulsepay -a claude-code',
 			targetDir: '.claude/skills/pulsepay/SKILL.md',
 			note: 'Native Claude Code skill. Trigger with /pulsepay or ask Claude to handle Whitechain, Chainlink CCIP, or Hedera payments.'
 		},
 		{
 			id: 'cursor',
 			label: 'Cursor',
-			command: 'npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a cursor',
+			command: 'npx skills add https://github.com/lviffy/PulsePay --skill pulsepay -a cursor',
 			targetDir: '.cursor/skills/pulsepay/SKILL.md',
 			note: 'Integrates with Cursor Composer and Chat. Automatically gives Cursor context for PulsePay APIs and contracts.'
 		},
 		{
 			id: 'windsurf',
 			label: 'Windsurf',
-			command: 'npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a windsurf',
+			command: 'npx skills add https://github.com/lviffy/PulsePay --skill pulsepay -a windsurf',
 			targetDir: '.windsurf/skills/pulsepay/SKILL.md',
 			note: 'Empowers Cascade agent with full knowledge of PulsePay merchant invoicing, treasury guard, and x402 tools.'
 		},
 		{
 			id: 'antigravity',
 			label: 'Antigravity',
-			command: 'npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a antigravity',
+			command: 'npx skills add https://github.com/lviffy/PulsePay --skill pulsepay -a antigravity',
 			targetDir: '.agents/skills/pulsepay/SKILL.md',
 			note: 'Standard Antigravity skill format. Works with Antigravity IDE and agy CLI subagent workflows.'
 		},
 		{
 			id: 'copilot',
 			label: 'GitHub Copilot',
-			command: 'npx skills add https://github.com/lviffy/ETHGLOBAL --skill pulsepay -a copilot',
+			command: 'npx skills add https://github.com/lviffy/PulsePay --skill pulsepay -a copilot',
 			targetDir: '.github/skills/pulsepay/SKILL.md',
 			note: 'Equips GitHub Copilot agent mode with PulsePay contracts, schemas, and integration patterns.'
 		}
