@@ -85,6 +85,11 @@ export class PulsePayClient {
       getExplorerUrl: (messageId: string): string => {
         return this.bridge.getExplorerUrl(messageId);
       },
+      bridgeWhitechainUsdtToSepolia: (
+        params: Parameters<typeof this.bridge.bridgeWhitechainUsdtToSepolia>[0]
+      ) => {
+        return this.bridge.bridgeWhitechainUsdtToSepolia(params);
+      },
     };
   }
 }

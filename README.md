@@ -1,22 +1,216 @@
 # PulsePay
 
-PulsePay combines a Whitechain USDT merchant contract and TypeScript SDK, Chainlink CCIP 2.0 cross-chain token bridging, and a native Hedera HTTP-402 payment flow.
+**One payment gateway for merchants and AI agents.**
 
-## Official NPM packages
+Collect USDT from customers, sell API access to agents, and manage billing from a merchant dashboard. SDKs handle checkout, contract calls, cross-chain transfer preparation, and HTTP 402 payment checks.
 
-All PulsePay SDKs and adapters are published to the npm registry under the `@pulsepay` scope:
+## Why Payments Break
+
+A software business needs to know which invoice was paid, when a subscription renews, and how much it can refund. A token transfer records money moving; the merchant still has to build the billing around it.
+
+An AI agent needs a different purchase flow. It must discover the price, check its budget, pay, and retrieve the resource through an API. It cannot rely on someone opening a checkout page for every request. When funds sit on another chain, the buyer also needs a supported transfer route and a way to track delivery.
+
+## What PulsePay Does
+
+PulsePay connects customer checkout and agent purchases through a shared set of billing tools. Merchants work in the dashboard; customers use payment links; agents follow a request–pay–retry flow. Developers integrate the parts they need through the SDKs.
+
+- **USDT invoices:** Create an invoice, share its checkout link, and associate the payment with the right customer and amount.
+- **Refund reserves:** Set aside a configurable share of incoming payments. Return partial or full payments to the original payer.
+- **Subscriptions:** Create plans, collect subscriber authorization, charge eligible cycles, and cancel future billing.
+- **Agent API payments:** Issue HTTP 402 payment challenges and release a response after checking the payment. Agents enforce merchant allowlists and spending budgets before signing.
+- **Cross-chain transfers:** Check route and token support, quote fees, prepare wallet transactions, and track destination execution through Chainlink CCIP 2.0.
+- **Merchant operations:** Read balances, manage invoices and refunds, view receipts and agent audit activity, and export accounting CSV.
+
+## Architecture
+
+```mermaid
+%%{init: {"theme": "neutral", "flowchart": {"curve": "linear"}}}%%
+flowchart TD
+    People["Merchants and customers"] --> Gateway["PulsePay · Dashboard, SDKs and payment API"]
+    Agents["AI agents"] --> Gateway
+    Gateway --> Whitechain["Whitechain · USDT billing"]
+    Gateway --> CCIP["CCIP 2.0 · Token transfers"]
+    Gateway --> Hedera["Hedera · Agent payments and audit"]
+```
+
+## Three Rails, Three Pillars
+
+### Whitechain
+
+**The merchant billing rail.** `PulsePayMerchantHub` holds USDT and stores invoice, payment, subscription, and balance records on Whitechain Sepolia. Checkout and the dashboard read the same contract state.
+
+```mermaid
+%%{init: {"theme": "neutral", "flowchart": {"curve": "linear"}}}%%
+flowchart TD
+    Merchant["Merchant dashboard or SDK"] -->|Create invoice| Hub["Whitechain merchant hub"]
+    Customer["Customer wallet"] -->|Approve and pay USDT| Hub
+    Hub --> Reserve["Refund reserve"]
+    Hub --> Available["Available proceeds"]
+    Reserve -->|Refund| Payer["Original payer"]
+    Available -->|Refund| Payer
+    Available -->|Withdraw| Wallet["Merchant wallet"]
+```
+
+- Checkout reads the invoice amount, due time, and status. The SDK checks the wallet network, approves USDT when needed, and confirms a matching `PaymentSettled` event.
+- Each payment is split between reserve and available proceeds at the merchant's configured rate. Refunds draw from reserve first, then available balance, and cannot exceed the remaining paid amount or held liquidity.
+- Subscription enrollment collects the first cycle. Later renewals check the due time, active state, cycle limit, and token allowance. Each Whitechain renewal requires a transaction; opening the dashboard does not trigger billing.
+- Contract events supply receipts and payment/refund history. CSV exports cover the selected event window.
+
+**Main contract functions**
+
+- `createInvoice(...)`, `cancelInvoice(invoiceId)`, `payInvoice(invoiceId)` — manage the invoice lifecycle.
+- `issueRefund(invoiceId, refundAmount, reasonHash)` — return funds to the original payer.
+- `fundRefundReserve(amount)`, `withdrawAvailable(amount, to)` — manage merchant liquidity.
+- `setMerchantReserveBps(bps)`, `getMerchantReserveBps(merchant)` — configure and read the reserve policy.
+- `createPlan(...)`, `createSubscription(subscriptionId, planId)`, `chargeRenewal(subscriptionId, renewalId)`, `cancelSubscription(subscriptionId)` — manage recurring billing. Duplicate renewal IDs are rejected.
+- `getInvoice`, `getPayment`, `getPlan`, `getSubscription`, `getMerchantBalances` — read billing state.
+
+The console supports plan creation, renewal charges, and cancellation. Subscriber enrollment uses the SDK or contract. USDT amounts use six decimals; WBT pays network gas.
+
+[Usage guide](docs/WHITECHAIN_USAGE.md) · [Contract](contracts/whitechain/src/PulsePayMerchantHub.sol) · [SDK adapter](packages/adapter-whitechain/src/client.ts)
+
+### Chainlink CCIP 2.0
+
+**The token-transfer rail.** The CCIP adapter prepares transfers across supported routes between Ethereum Sepolia, Arbitrum Sepolia, and Hedera Testnet. It uses existing CCIP routers and token pools.
+
+```mermaid
+%%{init: {"theme": "neutral", "flowchart": {"curve": "linear"}}}%%
+flowchart TD
+    App["Application and CCIP adapter"] -->|Check route and token, quote fee| Router["Source CCIP router"]
+    Wallet["Source wallet"] -->|Approve tokens and submit| Router
+    Router --> CCIP["CCIP token transfer"]
+    CCIP --> Recipient["Destination wallet"]
+    CCIP -.-> Monitor["Message status in SDK and Explorer"]
+```
+
+- Before quoting, the adapter checks the source RPC's chain, destination support, active on-ramp, registered source token pool, pool destination support, and destination-token mapping.
+- Fees come from the router's `getFee`. Native-asset fees are the default; a configured fee token may need a separate approval or a combined allowance when it is also the transferred token.
+- Transfers use an encoded recipient address, empty `data`, and `gasLimit = 0`. There is no requested destination callback. Source gas and CCIP fees still apply.
+- The SDK returns unsigned transactions. The application refreshes fees, confirms approvals, and has the wallet estimate gas and submit. It then tracks the real message ID until destination execution succeeds or fails.
+
+**Main adapter functions**
+
+- `checkLane(destinationSelector)` — check the route and discover its active on-ramp.
+- `quoteBridgeFee(params)` — validate token support and return the live fee.
+- `buildBridgeTransactions(params)` — return approval and `ccipSend` transaction payloads.
+- `CCIPMessageMonitor.getStatus(messageId)` and `waitForDelivery(messageId, options)` — query or poll delivery, with cancellation and timeout support.
+- `getExplorerUrl(messageId)` — open the message in CCIP Explorer.
+
+The core SDK exposes these operations through `bridgeOps`. `/merchant/treasury` displays lane configuration; transfer preparation uses the SDK. A confirmed source transaction is not destination delivery. Bridging funds a wallet; paying a Whitechain invoice remains a separate merchant-hub transaction.
+
+[Usage guide](docs/CHAINLINK_USAGE.md) · [Adapter](packages/adapter-ccip/src/bridge.ts) · [Message monitor](packages/adapter-ccip/src/monitor.ts)
+
+### Hedera
+
+**The agent payment and audit rail.** An agent discovers a service, receives an HTTP 402 challenge, checks its spending policy, and pays native HBAR. The API checks the transaction through Mirror Node before returning the purchased response.
+
+```mermaid
+%%{init: {"theme": "neutral", "flowchart": {"curve": "linear"}}}%%
+flowchart TD
+    Agent["Agent worker"] -->|Discover and request| API["Paid API"]
+    API -->|HTTP 402 and payment challenge| Agent
+    Agent --> Policy["Merchant allowlist and spending limits"]
+    Policy --> Pay["Native HBAR payment"]
+    Pay -->|Retry with payment evidence| Check["API checks Mirror Node receipt"]
+    Check --> Response["Purchased response"]
+    Agent -.->|Separate audit submission| HCS["HCS activity log"]
+```
+
+- **Hedera Agent Kit integration:** `X402PayTool` submits a payment or prepares unsigned bytes. `PulsePaySpendLimitPolicy` checks the merchant allowlist, per-payment cap, and daily transfer budget. Transaction and audit fees have separate caps.
+- **Receipt checks:** The server checks consensus success, payer, recipient, amount, network, time, and challenge binding. A transaction ID alone does not unlock the resource.
+- **Recovery:** The worker journals pending purchases. The same valid proof retrieves the saved response on retry, including after a restart.
+- **HCS audit:** `PulsePayHcsAuditHook` records agent activity and retains pending audit submissions. Retrying an audit does not require another purchase; an audit message is separate from payment evidence.
+- **Hedera EVM billing:** A second merchant hub supports token invoices and HSS-scheduled subscriptions on chain `296`. Subscribers bound renewals by cycle count, cumulative spend, and expiry. Scheduling requires token allowance and separate HBAR execution funding.
+
+**Main entry points**
+
+- `generateX402Manifest(...)`, `handleX402PaymentCheck(...)` — publish services, issue native-HBAR challenges, and check receipts.
+- `HederaEvmInvoicePayTool`, `handleEvmInvoicePaymentCheck(...)` — pay and redeem a challenge-bound token invoice. The server provisions the invoice before returning HTTP 402.
+- Hedera EVM contract: `createSubscription(subscriptionId, planId, maxSpend, expiresAt)`, `executeScheduledRenewal(...)`, `rearmSubscription(subscriptionId)`, `cancelSubscription(subscriptionId)`, and `fundExecution()`.
+
+Scheduled cancellations invalidate stale callbacks using a generation counter. Scheduling failures leave subscriptions available for re-arming. These HTTP 402 schemes are PulsePay receipt extensions; the demo APIs serve labelled sample content.
+
+[Usage guide](docs/HEDERA_USAGE.md) · [Agent tools](packages/adapter-hedera/src/index.ts) · [Payment middleware](packages/sdk-server/src/x402.ts) · [Hedera EVM contract](contracts/hedera/src/PulsePayHederaMerchantHub.sol)
+
+## Contracts and Networks
+
+The Whitechain hub below is the recorded demo deployment. The USDT address and CCIP routers are repository defaults; applications select their hub through configuration.
+
+| Component | Network | Address |
+| --- | --- | --- |
+| Whitechain merchant hub | Whitechain Sepolia · `1874` | [0xC81399e6344f9264830ecB6DF46a5e9458f4f2C3](https://explorer.testnet.whitechain.io/address/0xC81399e6344f9264830ecB6DF46a5e9458f4f2C3) |
+| USDT · 6 decimals | Whitechain Sepolia · `1874` | [0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7](https://explorer.testnet.whitechain.io/address/0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7) |
+| CCIP router | Ethereum Sepolia · `11155111` | [0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59](https://sepolia.etherscan.io/address/0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59) |
+| CCIP router | Arbitrum Sepolia · `421614` | [0x2a9C5afB0d0e4BAb2BCdaE109EC4b0c4Be15a165](https://sepolia.arbiscan.io/address/0x2a9C5afB0d0e4BAb2BCdaE109EC4b0c4Be15a165) |
+| CCIP router | Hedera Testnet · `296` | [0x802C5F84eAD128Ff36fD6a3f8a418e339f467Ce4](https://hashscan.io/testnet/contract/0x802C5F84eAD128Ff36fD6a3f8a418e339f467Ce4) |
+| HCS audit topic | Hedera Testnet | [0.0.11330043](https://hashscan.io/testnet/topic/0.0.11330043) |
+
+**Hedera EVM merchant hub:** No deployment address is recorded in the current configuration. Deploy [the contract](contracts/hedera/README.md) and set `HEDERA_EVM_MERCHANT_HUB_ADDRESS` and its settlement token. HSS (`0x16b`) and HTS (`0x167`) are system contracts, not PulsePay deployments.
+
+CCIP selectors differ from EVM chain IDs: Sepolia uses `16015286601757825753`, Arbitrum Sepolia `3478487238524512106`, and Hedera Testnet `222782988166878823`. Confirm current routers and supported tokens in the official directories for [Sepolia](https://docs.chain.link/ccip/directory/testnet/chain/ethereum-testnet-sepolia), [Arbitrum Sepolia](https://docs.chain.link/ccip/directory/testnet/chain/ethereum-testnet-sepolia-arbitrum-1), and [Hedera Testnet](https://docs.chain.link/ccip/directory/testnet/chain/hedera-testnet). A Whitechain token address cannot be assumed valid on another network.
+
+## End-to-End Workflows
+
+### Invoice to Refund
+
+1. Connect the merchant wallet in `/merchant/settings` and create a **10 USDT invoice** in `/merchant/invoices`.
+2. Share `/pricing-free?invoice=<invoice-id>`. The customer approves USDT if needed and pays. The dashboard and `/receipt/<invoice-id>` show the result.
+3. With an example 20% reserve policy, the hub holds 2 USDT in reserve and makes 8 USDT available. A 5 USDT refund uses the 2 USDT reserve and 3 USDT of available funds, assuming those balances are unchanged.
+4. The refund returns to the original payer. The merchant can withdraw remaining available proceeds or add reserve funds from `/merchant/treasury`.
+
+### Subscription to Renewal
+
+1. The merchant creates a plan; the subscriber authorizes it through the SDK or contract and pays the first cycle.
+2. At the next due time, a renewal collects the next payment if the subscription remains eligible. Whitechain uses an explicit renewal transaction; the Hedera EVM hub uses funded HSS schedules.
+3. Billing ends on cancellation or when the subscription's limits are reached.
+
+### Source Wallet to Destination Wallet
+
+1. An application selects a supported source token, destination, amount, and recipient.
+2. The SDK checks the route, quotes the fee, and prepares transactions. The wallet confirms approvals and submits the transfer.
+3. The application tracks the message ID until destination execution succeeds or fails. Successful delivery funds the recipient wallet.
+
+### Agent Request to Paid Response
+
+1. The worker reads `/.well-known/x402.json` and requests a resource. The API returns HTTP 402 with the price and payment challenge.
+2. The agent checks its budget and merchant allowlist, pays HBAR, and retries with payment evidence.
+3. The server checks the receipt and returns the saved resource response. The audit hook records activity in HCS; interrupted purchases resume from saved state.
+
+## Installation and Quickstart
+
+### Integrate Checkout
 
 ```bash
-# Core client & universal checkout
-npm install @pulsepay/sdk-core viem
-
-# React checkout widget & billing components
 npm install @pulsepay/sdk-react @pulsepay/sdk-core viem
+```
 
-# Server middleware & x402 resource server gateway
+Pass a deployed Whitechain hub and an existing bytes32 invoice ID:
+
+```tsx
+import { PulsePayProvider, PulsePayCheckout } from "@pulsepay/sdk-react";
+import type { Address, Hex } from "viem";
+
+export function Checkout({ hubAddress, invoiceId }: {
+  hubAddress: Address;
+  invoiceId: Hex;
+}) {
+  return (
+    <PulsePayProvider config={{ whitechain: { contractAddress: hubAddress } }}>
+      <PulsePayCheckout invoiceId={invoiceId} onSuccess={console.log} />
+    </PulsePayProvider>
+  );
+}
+```
+
+Checkout reads the invoice and uses the customer's browser wallet for approval and payment. `onSuccess` receives the confirmed transaction hash.
+
+For other integrations:
+
+```bash
+# HTTP 402 server helpers
 npm install @pulsepay/sdk-server @pulsepay/shared
 
-# Chain & protocol adapters
+# Individual chain adapters
 npm install @pulsepay/adapter-whitechain viem
 npm install @pulsepay/adapter-ccip viem
 npm install @pulsepay/adapter-hedera @hashgraph/hedera-agent-kit @hiero-ledger/sdk viem
@@ -32,217 +226,60 @@ npm install @pulsepay/adapter-hedera @hashgraph/hedera-agent-kit @hiero-ledger/s
 | [`@pulsepay/adapter-ccip`](packages/adapter-ccip) | `1.1.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-ccip)](https://www.npmjs.com/package/@pulsepay/adapter-ccip) | Chainlink CCIP 2.0 cross-chain token bridging adapter |
 | [`@pulsepay/adapter-hedera`](packages/adapter-hedera) | `1.1.0` | [![npm](https://img.shields.io/npm/v/@pulsepay/adapter-hedera)](https://www.npmjs.com/package/@pulsepay/adapter-hedera) | Hedera Agent Kit v4 spend policy, HCS audit hook & x402 |
 
-## What works
+`createPulsePay(config)` exposes `invoices`, `payments`, `subscriptions`, and `bridgeOps` through [the core SDK](packages/sdk-core/src/index.ts). Supply a viem wallet client for contract writes. Hedera agent tools use the dedicated adapter.
 
-- **Whitechain:** invoices, reserve-backed refunds, subscriptions and balances in `PulsePayMerchantHub.sol`. The SDK provides transaction encoders and direct USDT wallet checkout. Checkout confirms the wallet/RPC network, reads the actual invoice, approves only its amount when needed, and reports success only after a matching settlement event.
-- **Chainlink CCIP 2.0:** token-only cross-chain bridging across Ethereum Sepolia, Arbitrum Sepolia and Hedera Testnet using official CCIP Routers with zero callback gas overhead (`gasLimit = 0`, `data = ""`).
-- **Hedera:** native HBAR receipt payments plus a chain-296 merchant hub with finite HSS-scheduled subscriptions and challenge-bound EVM invoice payments. The EVM agent validates the live invoice, enforces a durable token budget, approves the exact amount, and the server unlocks the resource only after decoding a matching Mirror Node `PaymentSettled` log. Both HTTP-402 schemes are PulsePay extensions, not standardized facilitator interoperability.
+### Run Locally
 
-## Hedera hackathon quickstart
-
-This repository is the public-source target for the PulsePay Hedera submission. It contains the setup instructions, architecture, payment flow, local tests, and reproducible testnet evidence required to review the project.
-
-### Architecture
-
-```mermaid
-flowchart LR
-    Agent[AI agent / buyer worker]
-    API[Merchant API]
-    Console[Svelte merchant console]
-    Native[Native HBAR HTTP-402]
-    EVM[Hedera EVM invoice route<br/>chain 296]
-    Hub[PulsePayHederaMerchantHub]
-    HTS[HTS token<br/>0x167]
-    HSS[HSS scheduler<br/>0x16b]
-    Policy[Agent Kit tool<br/>durable spend policy]
-    Mirror[Hedera Mirror Node]
-    HCS[HCS audit topic]
-
-    Agent --> API
-    Console --> API
-    API --> Native
-    API --> EVM
-    EVM --> Hub
-    Hub --> HTS
-    Hub --> HSS
-    Agent --> Policy
-    Policy --> Hub
-    Native --> Mirror
-    EVM --> Mirror
-    Policy --> HCS
-```
-
-### Invoice payment sequence
-
-```mermaid
-sequenceDiagram
-    participant A as Agent worker
-    participant S as Merchant API
-    participant H as Merchant hub
-    participant T as HTS/ERC-20 token
-    participant M as Mirror Node
-
-    A->>S: POST protected resource
-    S->>H: provision challenge-bound invoice
-    H-->>S: InvoiceCreated
-    S-->>A: 402 + invoice, payer, amount, expiry
-    A->>H: read invoice and settlement token
-    A->>T: approve exact amount (if needed)
-    A->>H: payInvoice(invoiceId)
-    H->>T: transferFrom(payer, hub, amount)
-    H-->>A: PaymentSettled event
-    A->>S: retry with transaction proof
-    S->>M: query contract result and logs
-    M-->>S: successful call + PaymentSettled
-    S-->>A: protected resource response
-```
-
-### Autonomous subscription sequence
-
-```mermaid
-sequenceDiagram
-    participant P as Subscriber
-    participant H as Merchant hub
-    participant T as HTS/ERC-20 token
-    participant Q as HSS (0x16b)
-
-    P->>H: createSubscription(maxSpend, expiry)
-    H->>T: transferFrom(first cycle)
-    H->>Q: scheduleCall(next renewal)
-    Note over H,Q: HBAR execution funding is separate from token settlement
-    Q-->>H: executeScheduledRenewal(generation, cycle)
-    H->>T: transferFrom(next cycle)
-    H->>Q: scheduleCall(following cycle)
-    P->>H: cancelSubscription()
-    H->>Q: deleteSchedule()
-    Note over H: generation nonce invalidates stale callbacks even if deletion fails
-```
-
-### Payment flow
-
-1. An agent requests a protected resource and receives HTTP `402` with a challenge bound to the service, payer, merchant, amount, token, invoice ID, and expiry.
-2. The worker validates the challenge against its trusted Hedera configuration and spend policy. For the native route it submits HBAR; for the EVM route it reads the invoice, approves only the required HTS/ERC-20 amount, and calls `payInvoice`.
-3. The server queries Hedera Mirror Node, verifies success, and checks the exact payer, target contract, invoice, merchant, customer, amount, and `PaymentSettled` event.
-4. The verified response is persisted. Retrying the same proof returns the saved response without another payment; an altered or replayed proof is rejected.
-
-### Settled Hedera evidence
-
-The native HBAR payment path has a confirmed Hedera Testnet settlement:
-
-- Transaction ID: `0.0.11327364@1793912134.008842902`
-- Settlement: `1` tinybar to `0.0.11329845`
-- [View the confirmed transaction on HashScan](https://hashscan.io/testnet/transaction/0.0.11327364-1793912134-008842902)
-
-This evidence is for the native `hedera-native-receipt` route. The custom `hedera-evm-invoice-receipt` route is implemented and locally tested, but its live contract deployment remains dependent on a healthy Hedera testnet RPC and funded deployment credentials.
-
-### Run the demo
+Use **Node.js ≥22.13.0** and **pnpm 12.14.0**.
 
 ```bash
-pnpm install --frozen-lockfile --ignore-scripts
+git clone https://github.com/lviffy/ETHGLOBAL.git
+cd ETHGLOBAL
+pnpm install --frozen-lockfile
 cp .env.example .env
-pnpm build
-pnpm --filter pulsepay-demo-store start
 ```
 
-The API serves discovery at `/.well-known/x402.json`; the Svelte merchant console runs on port `3100`. See [Hedera implementation details](docs/HEDERA.md), [the EVM deployment guide](contracts/hedera/README.md), and [the implementation plan](docs/HEDERA_EVM_IMPLEMENTATION_PLAN.md) for configuration and limitations.
+Configure the integrations you need in [`.env`](.env.example):
 
-The SvelteKit merchant console uses deployed contracts and browser-wallet signing. Simulation dashboards, fixture invoice pages and preview mutation endpoints have been removed. The separate payment API serves sample content behind real Hedera receipt verification; it is not a live market feed. A cross-chain swap cannot currently settle a Whitechain invoice. See [the testing guide](docs/TESTING.md) for observed results and the complete manual test flow.
-
-## Setup
-
-Install Node.js **22.13 or newer**, **pnpm 12.14.0**, and [Foundry](https://getfoundry.sh/). pnpm is the authoritative package manager and `pnpm-lock.yaml` is the committed dependency graph.
-
-```bash
-pnpm install --frozen-lockfile --ignore-scripts
-cp .env.example .env   # only when you do not already have a .env
-```
-
-Set `PULSEPAY_API_SECRET` to a random value of at least 32 characters and `HEDERA_MERCHANT_ACCOUNT_ID` to an account you control. Set the other accounts, keys and contract addresses for the integrations you intend to use. Keep `.env` private and out of git. Existing signing keys are never generated by setup.
+- **Payment API:** Set `PULSEPAY_API_SECRET` to a random secret of at least 32 characters and set `HEDERA_MERCHANT_ACCOUNT_ID`.
+- **Whitechain:** Set `WHITECHAIN_MERCHANT_HUB_ADDRESS` and `PULSEPAY_MERCHANT_ADDRESS`. The connected wallet needs WBT for gas and USDT for payments; its token configuration must match the hub's `USDT()` getter.
+- **Native HBAR agent:** Set `HEDERA_SERVICE_ID=market-data-pro`, the buyer account/key, audit topic, and spending/fee limits. The example environment selects the EVM invoice service, so change the service ID for this walkthrough. The audit writer must control the topic's submit key.
+- **CCIP:** Set the source/destination chain IDs and a matching `CCIP_RPC_URL` or `SEPOLIA_RPC_URL`. The SDK demo also needs a supported `CCIP_TOKEN_ADDRESS`.
+- **Hedera EVM:** Configure the deployed hub, settlement token, merchant and buyer signers, and token spending limits listed in `.env.example`. Fund HBAR execution separately for scheduled subscriptions.
 
 ```bash
 pnpm build
-pnpm --filter pulsepay-demo-store start
+pnpm dev
 ```
 
-Application scripts load the root `.env` automatically and use the repository root as their working directory. The API listens on port 3000; its `/merchant` path redirects to the real frontend console on port 3100. For API session authentication, use `http://localhost:3000/merchant/login` with the merchant access secret from `.env`. API clients can instead send `x-api-key: <PULSEPAY_API_SECRET>`. Session cookies are HTTP-only, expire after one hour, and use SameSite=Strict. Production requires an HTTPS `PULSEPAY_APP_URL`.
+Open the [merchant dashboard](http://localhost:3100/merchant). The [payment API](http://localhost:3000) starts alongside it when its secret and merchant account are configured. Its [service manifest](http://localhost:3000/.well-known/x402.json) lists paid endpoints. Authenticated API reads use `x-api-key` or the [merchant login](http://localhost:3000/merchant/login).
 
-`npm run dev` (or `pnpm dev`) compiles the SDK packages with at most two builds at once, watches those packages, and runs the SvelteKit frontend at `http://localhost:3100`. If the root `.env` contains a valid merchant API secret and Hedera merchant account, it also starts the paid demo API on port 3000. `npm run dev:web` starts just the web development flow; `npm run dev:api` starts the configured API separately. The buyer agent is never launched automatically.
-
-The supervisor runs the installed Node CLIs directly and excludes production web builds from its watcher. An `npx`-backed `pnpm` wrapper is rejected before any build starts, preventing recursive launcher processes. `pnpm test:dev` checks both normal startup validation and rejection of that wrapper.
-
-The new UI lives in [apps/web](apps/web/README.md). Configure `WHITECHAIN_MERCHANT_HUB_ADDRESS`, `PULSEPAY_MERCHANT_ADDRESS`, `HEDERA_AUDIT_TOPIC_ID`, and `PULSEPAY_SERVICE_URL` for the real integrations you use. Unconfigured reads show a retryable error; the frontend has no simulated settlement fallback.
-
-## Verification
-
-```bash
-pnpm verify
-```
-
-This runs ESLint across all nine workspaces and startup tools, builds TypeScript, runs all JavaScript and Solidity suites, and checks high/critical dependency advisories. The same command runs in `.github/workflows/verify.yml`. Contract tests use a pinned Solidity 0.8.26 compiler and Cancun EVM target. The wrapper uses standard Foundry installations; existing local `.bin/forge` and `.bin/solc` are optional fallbacks.
-
-Useful individual checks:
-
-```bash
-pnpm lint
-pnpm test:unit
-pnpm test:contracts
-pnpm audit
-```
-
-Tests use temporary files, mock payment submitters and local EVM execution. They do not spend testnet or mainnet funds.
-
-## APIs
-
-| Route | Access | Behavior |
-| --- | --- | --- |
-| `GET /.well-known/x402.json` | Public | Native Hedera service discovery |
-| `POST /v1/services/:serviceId/query` | Payment proof | 402 challenge; a verified receipt unlocks one saved response |
-| `GET /receipt/hedera/:transactionId` | Public | Verified Hedera receipt |
-| `GET /api/merchant/state` | Merchant | Verified Hedera totals and activities only |
-| `GET /api/export.csv` | Merchant | Verified payments only |
-| `GET /api/hedera/payments` | Merchant | Verified payment records, without challenge secrets or saved response data |
-| `GET /api/whitechain/invoices/:bytes32` | Merchant | Real contract invoice read using configured hub/RPC |
-| `POST /api/bridge/quote` | Merchant | Real-time Chainlink CCIP 2.0 bridge fee quote |
-
-The bridge endpoint accepts `destinationChainId` (or `destinationChainSelector`), `tokenAddress`, `amountUnits` (integer string), and `recipientAddress`. It quotes the required CCIP network fee directly from the configured CCIP Router without broadcasting transactions.
-
-## React checkout
-
-Create a connected viem wallet client on Whitechain Sepolia and pass it into the provider. The invoice must already exist on the configured merchant hub.
-
-```tsx
-<PulsePayProvider config={{ whitechain: { contractAddress: hubAddress, walletClient } }}>
-  <PulsePayCheckout invoiceId={invoiceBytes32} onSuccess={handleConfirmedPayment} />
-</PulsePayProvider>
-```
-
-`onSuccess` receives a verified transaction hash. No hardcoded invoice amount or random success hash is used. The supplied wallet must expose an authorized account on chain 1874. The simulation-only `MerchantBillingDashboard` component and export have been removed; use the SvelteKit merchant console for real billing operations.
-
-## Hedera buyer
-
-Running the buyer with a configured signing key can spend real HBAR and transaction fees. Without a key it prepares unsigned wallet bytes.
+Start the buyer separately:
 
 ```bash
 pnpm --filter pulsepay-agent-worker start
 ```
 
-The buyer journals the payment transaction ID before submission. An unresolved saved purchase is resumed instead of purchasing again. `HEDERA_PAYMENT_TRANSACTION_ID` can select the confirmed transaction for a saved wallet-prepared purchase. A successfully redeemed proof returns the original saved response on retry, including after server restart, without executing another purchase. A different proof cannot reuse that challenge or transaction.
+The scripts load the root `.env` automatically. With a signing key, the native worker can execute payments; without a buyer or operator key it prepares unsigned wallet bytes. Keep signing keys in the server or worker environment and preserve `.pulsepay/` across restarts. Production requires an absolute `PULSEPAY_STATE_DIRECTORY` on persistent storage; the file store supports one server and one worker, rather than multiple replicas.
 
-For the Hedera EVM path, set `HEDERA_SERVICE_ID=agent-invoice-pro` and configure the hub, settlement token, merchant signer, buyer signer/address, token-unit caps, and RPC values shown in `.env.example`. The merchant signer provisions a unique invoice before the API advertises its 402 challenge. `HEDERA_EVM_PAYMENT_TRANSACTION_HASH` resumes redemption of an already-submitted payment without paying again. See [the Hedera contract guide](contracts/hedera/README.md) for deployment and HSS funding.
+## Tech Stack
 
-Per-request and daily limits cover transfer amounts. Network and HCS fees have separate transaction caps; these settings do not provide a global wallet fee budget. See [Hedera protocol details and historical live evidence](docs/HEDERA.md).
+| Layer | Technology |
+| --- | --- |
+| Merchant dashboard | Svelte 5, SvelteKit, Tailwind CSS 4 |
+| SDKs and payment API | TypeScript, Node.js, viem, React checkout components |
+| Contracts | Solidity 0.8.26, OpenZeppelin, Foundry |
+| Merchant billing | Whitechain Sepolia, USDT |
+| Cross-chain transfers | Chainlink CCIP 2.0 routers and token pools |
+| Agent payments and audit | Hedera Agent Kit v4, Hiero SDK, Mirror Node, HCS |
+| Scheduled token billing | Hedera EVM, ERC-20 / HTS settlement, HSS |
+| Workspace | pnpm, Turborepo |
 
-## State and deployment
+## Source Map
 
-Development state defaults to `.pulsepay`. Production must set `PULSEPAY_STATE_DIRECTORY` to an **absolute path on a persistent volume**. Preserve this directory across restarts: it holds challenges/redemptions, cached purchased responses, budgets, refunds and pending audit records.
+- [Merchant dashboard](apps/web/src/lib/components/MerchantDashboard.svelte) and [checkout example](packages/sdk-react/examples/checkout-page.tsx).
+- [Payment API](apps/demo-store/src/index.ts) and [buyer worker](apps/agent-worker/src/index.ts).
+- [Whitechain contract](contracts/whitechain/src/PulsePayMerchantHub.sol) and [Hedera EVM contract](contracts/hedera/src/PulsePayHederaMerchantHub.sol).
+- [Core SDK](packages/sdk-core/src/index.ts), [server SDK](packages/sdk-server/src/index.ts), and [chain adapters](packages).
 
-One server and one buyer worker may own their respective state files. Ownership locks reject duplicate processes. After an abnormal crash, verify that the named process/host has stopped before removing a stale `server-owner.lock` or `worker-owner.lock` directory. Multiple servers or buyer replicas require a transactional shared store; this file-backed deployment deliberately rejects them. Atomic file replacement is not a substitute for a database or backup.
-
-Unused challenges expire and are pruned; active challenges are capped at 1,000 and total retained records at 10,000. Saved resource responses are limited to 64 KiB. Capacity exhaustion fails closed and requires merchant maintenance/migration; redeemed identifiers are never silently dropped. HTTP requests and sign-in/challenge creation are rate-limited, and request bodies are bounded.
-
-## Integration review
-
-
-No deployments or onchain transactions are part of the local repair/verification workflow.
-
-[Original audit and remediation status](docs/CONFIGURATION_AUDIT.md) · [Whitechain feedback](WHITECHAIN_FEEDBACK.md) · [Integration audit](docs/CCIP_REVIEW.md)
+MIT licensed.

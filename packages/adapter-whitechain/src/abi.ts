@@ -1479,3 +1479,180 @@ export const erc20Abi = [
     stateMutability: "nonpayable"
   }
 ] as const;
+
+export const whitechainCCIPBridgeAbi = [
+  {
+    type: "function",
+    name: "bridgeTokens",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "destChainSelector", type: "uint64" },
+      { name: "recipient", type: "address" },
+      { name: "nonce", type: "uint256" },
+      { name: "signature", type: "bytes" }
+    ],
+    outputs: [{ name: "depositId", type: "bytes32" }],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "getDepositHash",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "destChainSelector", type: "uint64" },
+      { name: "recipient", type: "address" },
+      { name: "nonce", type: "uint256" },
+      { name: "sender", type: "address" }
+    ],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "isDepositUsed",
+    inputs: [{ name: "depositId", type: "bytes32" }],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "userNonces",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "mapper",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "authorizedSigner",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "signatureRequired",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "paused",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "pause",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "unpause",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "setAuthorizedSigner",
+    inputs: [{ name: "newSigner", type: "address" }],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "setSignatureRequired",
+    inputs: [{ name: "required", type: "bool" }],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "withdrawTokenLiquidity",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "event",
+    name: "Deposit",
+    inputs: [
+      { name: "depositId", type: "bytes32", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "sender", type: "address", indexed: true },
+      { name: "recipient", type: "address", indexed: false },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "destChainSelector", type: "uint64", indexed: false },
+      { name: "nonce", type: "uint256", indexed: false },
+      { name: "timestamp", type: "uint256", indexed: false }
+    ],
+    anonymous: false
+  }
+] as const;
+
+export const whitechainBridgeMapperAbi = [
+  {
+    type: "function",
+    name: "getTokenConfig",
+    inputs: [
+      { name: "localToken", type: "address" },
+      { name: "destChainSelector", type: "uint64" }
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "localToken", type: "address" },
+          { name: "foreignToken", type: "address" },
+          { name: "destChainSelector", type: "uint64" },
+          { name: "transferType", type: "uint8" },
+          { name: "minAmount", type: "uint256" },
+          { name: "maxAmount", type: "uint256" },
+          { name: "dailyLimit", type: "uint256" },
+          { name: "currentDailyVolume", type: "uint256" },
+          { name: "lastVolumeReset", type: "uint256" },
+          { name: "isActive", type: "bool" }
+        ]
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "isTokenSupported",
+    inputs: [
+      { name: "localToken", type: "address" },
+      { name: "destChainSelector", type: "uint64" }
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "getRemainingDailyLimit",
+    inputs: [
+      { name: "localToken", type: "address" },
+      { name: "destChainSelector", type: "uint64" }
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view"
+  }
+] as const;

@@ -12,10 +12,13 @@ import {
   type TransactionReceipt,
 } from "viem";
 import { whitechainSepolia } from "./chain.js";
-import { pulsePayMerchantHubAbi, erc20Abi } from "./abi.js";
+import { pulsePayMerchantHubAbi, erc20Abi, whitechainCCIPBridgeAbi, whitechainBridgeMapperAbi } from "./abi.js";
 import {
   WHITECHAIN_USDT_ADDRESS,
   WHITECHAIN_USDT_DECIMALS,
+  DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
+  DEFAULT_WHITECHAIN_MAPPER_ADDRESS,
+  CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA,
   Invoice,
   PaymentRecord,
   Subscription,
@@ -25,6 +28,8 @@ import {
 export interface WhitechainClientConfig {
   contractAddress: `0x${string}`;
   usdtAddress?: `0x${string}`;
+  bridgeAddress?: `0x${string}`;
+  mapperAddress?: `0x${string}`;
   rpcUrl?: string;
   publicClient?: PublicClient;
   walletClient?: WalletClient;
@@ -64,11 +69,15 @@ export class WhitechainAdapter {
   public readonly walletClient?: WalletClient;
   public readonly contractAddress: `0x${string}`;
   public readonly usdtAddress: `0x${string}`;
+  public readonly bridgeAddress: `0x${string}`;
+  public readonly mapperAddress: `0x${string}`;
 
   constructor(config: WhitechainClientConfig) {
     if (!/^0x[a-fA-F0-9]{40}$/.test(config.contractAddress) || /^0x0{40}$/i.test(config.contractAddress)) throw new Error("Configure a nonzero Whitechain merchant hub address");
     this.contractAddress = config.contractAddress;
     this.usdtAddress = config.usdtAddress || WHITECHAIN_USDT_ADDRESS;
+    this.bridgeAddress = config.bridgeAddress || DEFAULT_WHITECHAIN_BRIDGE_ADDRESS;
+    this.mapperAddress = config.mapperAddress || DEFAULT_WHITECHAIN_MAPPER_ADDRESS;
     this.walletClient = config.walletClient;
 
     this.publicClient =
@@ -717,5 +726,135 @@ export class WhitechainAdapter {
         args: [amountUnits],
       }),
     };
+  }
+
+  // --- Cross-Chain Bridge Methods (whitechain-labs/bridge-contracts reference) ---
+
+  async getBridgeNonce(account: `0x${string}`): Promise<bigint> {
+    const nonce = await this.publicClient.readContract({
+      address: this.bridgeAddress,
+      abi: whitechainCCIPBridgeAbi,
+      functionName: "userNonces",
+      args: [account],
+    });
+    return nonce as bigint;
+  }
+
+  async isDepositProcessed(depositId: `0x${string}`): Promise<boolean> {
+    const used = await this.publicClient.readContract({
+      address: this.bridgeAddress,
+      abi: whitechainCCIPBridgeAbi,
+      functionName: "isDepositUsed",
+      args: [depositId],
+    });
+    return used as boolean;
+  }
+
+  async getBridgeTokenConfig(token?: `0x${string}`, destChainSelector?: bigint) {
+    const tokenAddress = token || this.usdtAddress;
+    const selector = destChainSelector ?? CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA;
+    return this.publicClient.readContract({
+      address: this.mapperAddress,
+      abi: whitechainBridgeMapperAbi,
+      functionName: "getTokenConfig",
+      args: [tokenAddress, selector],
+    });
+  }
+
+  encodeApproveBridge(amountUnits: bigint, token?: `0x${string}`) {
+    const tokenAddress = token || this.usdtAddress;
+    return {
+      to: tokenAddress,
+      data: encodeFunctionData({
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [this.bridgeAddress, amountUnits],
+      }),
+    };
+  }
+
+  encodeBridgeTokens(args: {
+    token?: `0x${string}`;
+    amountUnits: bigint;
+    destChainSelector?: bigint;
+    recipient: `0x${string}`;
+    nonce?: bigint;
+    signature?: `0x${string}`;
+  }) {
+    const token = args.token || this.usdtAddress;
+    const destChainSelector = args.destChainSelector ?? CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA;
+    const nonce = args.nonce ?? 0n;
+    const signature = args.signature ?? "0x";
+
+    return {
+      to: this.bridgeAddress,
+      data: encodeFunctionData({
+        abi: whitechainCCIPBridgeAbi,
+        functionName: "bridgeTokens",
+        args: [token, args.amountUnits, destChainSelector, args.recipient, nonce, signature],
+      }),
+    };
+  }
+
+  async bridgeTokens(
+    args: {
+      token?: `0x${string}`;
+      amountUnits: bigint;
+      destChainSelector?: bigint;
+      recipient: `0x${string}`;
+      nonce?: bigint;
+      signature?: `0x${string}`;
+    },
+    walletClient?: WalletClient
+  ): Promise<{ txHash: `0x${string}`; depositId?: `0x${string}`; receipt: TransactionReceipt }> {
+    const { client, account, address } = await this.getAccount(walletClient);
+    const token = args.token || this.usdtAddress;
+    const destChainSelector = args.destChainSelector ?? CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA;
+
+    const nonce = args.nonce !== undefined ? args.nonce : await this.getBridgeNonce(address);
+    const signature = args.signature ?? "0x";
+
+    // Check allowance
+    const allowance = (await this.publicClient.readContract({
+      address: token,
+      abi: erc20Abi,
+      functionName: "allowance",
+      args: [address, this.bridgeAddress],
+    })) as bigint;
+
+    if (allowance < args.amountUnits) {
+      const approveTx = await client.writeContract({
+        address: token,
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [this.bridgeAddress, args.amountUnits],
+        account,
+        chain: whitechainSepolia,
+      });
+      await this.publicClient.waitForTransactionReceipt({ hash: approveTx });
+    }
+
+    const txHash = await client.writeContract({
+      address: this.bridgeAddress,
+      abi: whitechainCCIPBridgeAbi,
+      functionName: "bridgeTokens",
+      args: [token, args.amountUnits, destChainSelector, args.recipient, nonce, signature],
+      account,
+      chain: whitechainSepolia,
+    });
+
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
+
+    let depositId: `0x${string}` | undefined;
+    const depositLogs = parseEventLogs({
+      abi: whitechainCCIPBridgeAbi,
+      logs: receipt.logs,
+      eventName: "Deposit",
+    });
+    if (depositLogs.length > 0 && depositLogs[0].args) {
+      depositId = (depositLogs[0].args as any).depositId;
+    }
+
+    return { txHash, depositId, receipt };
   }
 }

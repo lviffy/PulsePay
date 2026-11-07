@@ -12,6 +12,10 @@ export const WHITECHAIN_SEPOLIA_BLOCKSCOUT_API = "https://explorer.testnet.white
 export const WHITECHAIN_USDT_ADDRESS = "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7" as const;
 export const WHITECHAIN_USDT_DECIMALS = 6;
 
+// Whitechain Bridge & Mapper Addresses (whitechain-labs/bridge-contracts reference)
+export const DEFAULT_WHITECHAIN_BRIDGE_ADDRESS = "0x3f68b5aE5Fe75E1160af9D5e296EF1976092780E" as const;
+export const DEFAULT_WHITECHAIN_MAPPER_ADDRESS = "0x8CD9AF6f242F79D034C08d59546fF2864C82E51A" as const;
+
 // Ethereum Sepolia Testnet
 export const ETHEREUM_SEPOLIA_CHAIN_ID = 11155111;
 export const ETHEREUM_SEPOLIA_RPC = "https://rpc.sepolia.org";

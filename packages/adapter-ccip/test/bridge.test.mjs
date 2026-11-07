@@ -138,3 +138,73 @@ test("token pools must be registered, connected and have a destination token", a
     await assert.rejects(new CCIPBridgeAdapter({ publicClient: client }).quoteBridgeFee(params), expected);
   }
 });
+
+test("buildWhitechainBridgeDeposit builds valid approval and bridgeTokens calldata with signature", async () => {
+  const { buildWhitechainBridgeDeposit, computeWhitechainDepositHash } = await import("../dist/index.js");
+  const { decodeFunctionData, recoverAddress } = await import("viem");
+  const { WHITECHAIN_CCIP_BRIDGE_ABI, ERC20_ABI, DEFAULT_WHITECHAIN_BRIDGE_ADDRESS, WHITECHAIN_USDT_ADDRESS, CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA } = await import("../dist/constants.js");
+
+  const signerPk = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+  const expectedSigner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+  const sender = "0x1111111111111111111111111111111111111111";
+  const recipient = "0x2222222222222222222222222222222222222222";
+  const amount = 500_000000n; // 500 USDT
+
+  const payload = await buildWhitechainBridgeDeposit({
+    senderAddress: sender,
+    recipientAddress: recipient,
+    amountUnits: amount,
+    signerPrivateKey: signerPk,
+  });
+
+  assert.equal(payload.approvalTx.to.toLowerCase(), WHITECHAIN_USDT_ADDRESS.toLowerCase());
+  const decodedApprove = decodeFunctionData({ abi: ERC20_ABI, data: payload.approvalTx.data });
+  assert.equal(decodedApprove.functionName, "approve");
+  assert.equal(decodedApprove.args[0].toLowerCase(), DEFAULT_WHITECHAIN_BRIDGE_ADDRESS.toLowerCase());
+  assert.equal(decodedApprove.args[1], amount);
+
+  assert.equal(payload.bridgeTx.to.toLowerCase(), DEFAULT_WHITECHAIN_BRIDGE_ADDRESS.toLowerCase());
+  const decodedBridge = decodeFunctionData({ abi: WHITECHAIN_CCIP_BRIDGE_ABI, data: payload.bridgeTx.data });
+  assert.equal(decodedBridge.functionName, "bridgeTokens");
+  assert.equal(decodedBridge.args[0].toLowerCase(), WHITECHAIN_USDT_ADDRESS.toLowerCase());
+  assert.equal(decodedBridge.args[1], amount);
+  assert.equal(decodedBridge.args[2], CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA);
+  assert.equal(decodedBridge.args[3].toLowerCase(), recipient.toLowerCase());
+  assert.equal(decodedBridge.args[4], 0n);
+  assert.equal(decodedBridge.args[5], payload.signature);
+
+  // Verify signature recovery
+  const recovered = await recoverAddress({
+    hash: payload.depositId,
+    signature: payload.signature,
+  });
+  assert.equal(recovered.toLowerCase(), expectedSigner.toLowerCase());
+});
+
+test("buildWhitechainBridgeDeposit validates input parameters", async () => {
+  const { buildWhitechainBridgeDeposit } = await import("../dist/index.js");
+  await assert.rejects(
+    buildWhitechainBridgeDeposit({
+      senderAddress: ZERO_ADDRESS,
+      recipientAddress: "0x2222222222222222222222222222222222222222",
+      amountUnits: 100n,
+    }),
+    /Invalid senderAddress/
+  );
+  await assert.rejects(
+    buildWhitechainBridgeDeposit({
+      senderAddress: "0x1111111111111111111111111111111111111111",
+      recipientAddress: ZERO_ADDRESS,
+      amountUnits: 100n,
+    }),
+    /Invalid recipientAddress/
+  );
+  await assert.rejects(
+    buildWhitechainBridgeDeposit({
+      senderAddress: "0x1111111111111111111111111111111111111111",
+      recipientAddress: "0x2222222222222222222222222222222222222222",
+      amountUnits: 0n,
+    }),
+    /amountUnits must be greater than 0/
+  );
+});

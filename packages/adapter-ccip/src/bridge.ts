@@ -8,9 +8,14 @@ import {
   parseAbiParameters,
   concat,
   isAddress,
+  getAddress,
+  hashMessage,
+  toBytes,
+  keccak256,
   type Address,
   type Hex,
 } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import {
   CCIP_ROUTER_ABI,
   CCIP_ONRAMP_ABI,
@@ -20,6 +25,11 @@ import {
   CCIP_DEFAULT_ROUTERS,
   CCIP_EXPLORER_BASE_URL,
   EVM_EXTRA_ARGS_V2_TAG,
+  WHITECHAIN_CCIP_BRIDGE_ABI,
+  DEFAULT_WHITECHAIN_BRIDGE_ADDRESS,
+  WHITECHAIN_USDT_ADDRESS,
+  CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA,
+  WHITECHAIN_SEPOLIA_CHAIN_ID,
 } from "./constants.js";
 import type { BridgeQuote, BridgeTransactionPayload } from "@pulsepay/shared";
 
@@ -46,6 +56,37 @@ export interface BuildBridgeParams extends QuoteBridgeParams {
   payerAddress?: Address;
 }
 
+export interface BuildWhitechainBridgeDepositParams {
+  tokenAddress?: Address;
+  amountUnits: bigint;
+  recipientAddress: Address;
+  senderAddress: Address;
+  nonce?: bigint;
+  destChainSelector?: bigint;
+  signerPrivateKey?: Hex;
+  signature?: Hex;
+  bridgeAddress?: Address;
+  chainId?: bigint;
+}
+
+export interface WhitechainBridgeDepositPayload {
+  depositId: Hex;
+  rawHash: Hex;
+  approvalTx: {
+    to: Address;
+    data: Hex;
+    value: 0n;
+  };
+  bridgeTx: {
+    to: Address;
+    data: Hex;
+    value: 0n;
+  };
+  signature: Hex;
+  nonce: bigint;
+  destChainSelector: bigint;
+}
+
 /**
  * Encodes extraArgs for CCIP EVM token-only transfers.
  * Uses EVMExtraArgsV2 tag (0x181dcf10) with gasLimit = 0 and allowOutOfOrderExecution = true.
@@ -66,6 +107,146 @@ export function encodeTokenOnlyExtraArgs(
  */
 export function encodeReceiverAddress(recipient: Address): Hex {
   return encodeAbiParameters(parseAbiParameters("address"), [recipient]);
+}
+
+/**
+ * Computes the raw 32-byte hash for a Whitechain CCIP Bridge deposit.
+ * Matches keccak256(abi.encode(token, amount, destChainSelector, recipient, nonce, sender, chainId, bridgeAddress))
+ */
+export function computeWhitechainDepositRawHash(params: {
+  token: Address;
+  amount: bigint;
+  destChainSelector: bigint;
+  recipient: Address;
+  nonce: bigint;
+  sender: Address;
+  chainId?: bigint;
+  bridgeAddress?: Address;
+}): Hex {
+  const chainId = params.chainId ?? BigInt(WHITECHAIN_SEPOLIA_CHAIN_ID);
+  const bridgeAddress = params.bridgeAddress ?? DEFAULT_WHITECHAIN_BRIDGE_ADDRESS;
+
+  return keccak256(
+    encodeAbiParameters(
+      parseAbiParameters("address, uint256, uint64, address, uint256, address, uint256, address"),
+      [
+        getAddress(params.token),
+        params.amount,
+        params.destChainSelector,
+        getAddress(params.recipient),
+        params.nonce,
+        getAddress(params.sender),
+        chainId,
+        getAddress(bridgeAddress),
+      ]
+    )
+  );
+}
+
+/**
+ * Computes the Ethereum Signed Message hash for a Whitechain CCIP Bridge deposit.
+ * Matches MessageHashUtils.toEthSignedMessageHash(rawHash) on WhitechainCCIPBridge.
+ */
+export function computeWhitechainDepositHash(params: {
+  token: Address;
+  amount: bigint;
+  destChainSelector: bigint;
+  recipient: Address;
+  nonce: bigint;
+  sender: Address;
+  chainId?: bigint;
+  bridgeAddress?: Address;
+}): Hex {
+  const rawHash = computeWhitechainDepositRawHash(params);
+  return hashMessage({ raw: toBytes(rawHash) });
+}
+
+/**
+ * Builds the unsigned transactions for approving tokens and calling bridgeTokens on WhitechainCCIPBridge.
+ * Optionally signs the deposit voucher if signerPrivateKey is provided.
+ */
+export async function buildWhitechainBridgeDeposit(
+  params: BuildWhitechainBridgeDepositParams
+): Promise<WhitechainBridgeDepositPayload> {
+  const rawToken = params.tokenAddress ?? WHITECHAIN_USDT_ADDRESS;
+  if (!isAddress(rawToken) || rawToken === ZERO_ADDRESS) {
+    throw new Error(`Invalid tokenAddress: ${rawToken}`);
+  }
+  if (!isAddress(params.recipientAddress) || params.recipientAddress === ZERO_ADDRESS) {
+    throw new Error(`Invalid recipientAddress: ${params.recipientAddress}`);
+  }
+  if (!isAddress(params.senderAddress) || params.senderAddress === ZERO_ADDRESS) {
+    throw new Error(`Invalid senderAddress: ${params.senderAddress}`);
+  }
+  if (typeof params.amountUnits !== "bigint" || params.amountUnits <= 0n) {
+    throw new Error("amountUnits must be greater than 0");
+  }
+
+  const token = getAddress(rawToken);
+  const recipientAddress = getAddress(params.recipientAddress);
+  const senderAddress = getAddress(params.senderAddress);
+  const bridgeAddress = getAddress(params.bridgeAddress ?? DEFAULT_WHITECHAIN_BRIDGE_ADDRESS);
+  const destChainSelector = params.destChainSelector ?? CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA;
+  const nonce = params.nonce ?? 0n;
+  const chainId = params.chainId ?? BigInt(WHITECHAIN_SEPOLIA_CHAIN_ID);
+
+  const rawHash = computeWhitechainDepositRawHash({
+    token,
+    amount: params.amountUnits,
+    destChainSelector,
+    recipient: recipientAddress,
+    nonce,
+    sender: senderAddress,
+    chainId,
+    bridgeAddress,
+  });
+
+  const depositId = hashMessage({ raw: toBytes(rawHash) });
+
+  let signature: Hex = params.signature ?? "0x";
+  if (params.signerPrivateKey) {
+    const account = privateKeyToAccount(params.signerPrivateKey);
+    signature = await account.signMessage({
+      message: { raw: toBytes(rawHash) },
+    });
+  }
+
+  const approvalData = encodeFunctionData({
+    abi: ERC20_ABI,
+    functionName: "approve",
+    args: [bridgeAddress, params.amountUnits],
+  });
+
+  const bridgeData = encodeFunctionData({
+    abi: WHITECHAIN_CCIP_BRIDGE_ABI,
+    functionName: "bridgeTokens",
+    args: [
+      token,
+      params.amountUnits,
+      destChainSelector,
+      recipientAddress,
+      nonce,
+      signature,
+    ],
+  });
+
+  return {
+    depositId,
+    rawHash,
+    approvalTx: {
+      to: token,
+      data: approvalData,
+      value: 0n,
+    },
+    bridgeTx: {
+      to: bridgeAddress,
+      data: bridgeData,
+      value: 0n,
+    },
+    signature,
+    nonce,
+    destChainSelector,
+  };
 }
 
 export class CCIPBridgeAdapter {
@@ -262,6 +443,42 @@ export class CCIPBridgeAdapter {
   }
 
   /**
+   * Builds unsigned transactions for bridging Whitechain USDT to Ethereum Sepolia via WhitechainCCIPBridge.
+   */
+  public async buildWhitechainBridgeDeposit(
+    params: BuildWhitechainBridgeDepositParams
+  ): Promise<WhitechainBridgeDepositPayload> {
+    return buildWhitechainBridgeDeposit(params);
+  }
+
+  /**
+   * Bridges Whitechain USDT to Ethereum Sepolia via WhitechainCCIPBridge (whitechain-labs/bridge-contracts reference).
+   * First-class SDK operation returning prepared approval and bridgeTokens payload with cryptographic voucher.
+   */
+  public async bridgeWhitechainUsdtToSepolia(params: {
+    amountUnits: bigint;
+    recipientAddress: Address;
+    senderAddress: Address;
+    tokenAddress?: Address;
+    signerPrivateKey?: Hex;
+    signature?: Hex;
+    bridgeAddress?: Address;
+    nonce?: bigint;
+  }): Promise<WhitechainBridgeDepositPayload> {
+    return buildWhitechainBridgeDeposit({
+      tokenAddress: params.tokenAddress ?? WHITECHAIN_USDT_ADDRESS,
+      amountUnits: params.amountUnits,
+      recipientAddress: params.recipientAddress,
+      senderAddress: params.senderAddress,
+      destChainSelector: CCIP_CHAIN_SELECTOR_ETHEREUM_SEPOLIA,
+      nonce: params.nonce,
+      signerPrivateKey: params.signerPrivateKey,
+      signature: params.signature,
+      bridgeAddress: params.bridgeAddress,
+    });
+  }
+
+  /**
    * Generates a link to track the cross-chain message on CCIP Explorer.
    */
   public getExplorerUrl(messageId: string): string {
@@ -269,4 +486,3 @@ export class CCIPBridgeAdapter {
     return `${CCIP_EXPLORER_BASE_URL}/${normalized}`;
   }
 }
-
