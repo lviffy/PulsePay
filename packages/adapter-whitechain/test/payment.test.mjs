@@ -23,3 +23,43 @@ test('network mismatch, reverted approval and missing settlement event cannot re
  const missing=setup({allowance:20000000n,event:false});await assert.rejects(missing.adapter.payInvoice(id),/no matching settlement/);
  await assert.rejects(new WhitechainAdapter({contractAddress:hub}).payInvoice(id),/Connect a wallet/);
 });
+
+test('payment evidence uses a bounded event range around the settlement timestamp', async () => {
+ for (const paidBlock of [0n, 100n, 6500000n, 12999999n, 13000000n]) {
+  let queried = false;
+  const publicClient = {
+   readContract: async () => ({invoiceId:id,merchant,customer:payer,amountPaid:20n,amountRefunded:0n,paidAt:1000n+paidBlock*2n,status:1}),
+   getBlockNumber: async () => 13000000n,
+   getBlock: async ({blockNumber}) => ({timestamp:1000n+blockNumber*2n}),
+   getLogs: async ({fromBlock,toBlock,args,address,event}) => {
+    queried = true;
+    assert.ok(toBlock-fromBlock <= 1999n);
+    assert.ok(fromBlock <= paidBlock && toBlock >= paidBlock);
+    assert.equal(args.invoiceId,id);
+    assert.equal(address,hub);
+    assert.equal(event.name,'PaymentSettled');
+    return [{transactionHash:hash}];
+   }
+  };
+  const adapter = new WhitechainAdapter({contractAddress:hub,publicClient});
+  const payment = await adapter.getPayment(id);
+  assert.ok(queried);
+  assert.equal(payment.txHash,hash);
+  assert.equal(payment.amountPaidUnits,20n);
+ }
+});
+
+test('settled payment remains readable if event history is unavailable', async () => {
+ const record = {invoiceId:id,merchant,customer:payer,amountPaid:20n,amountRefunded:5n,paidAt:1000n,status:2};
+ for (const fail of [true,false]) {
+  const adapter = new WhitechainAdapter({contractAddress:hub,publicClient:{
+   readContract:async()=>record,
+   getBlockNumber:async()=>10n,
+   getLogs:async()=>{if(fail)throw Error('RPC unavailable');return [];}
+  }});
+  const payment = await adapter.getPayment(id);
+  assert.equal(payment.status,'PARTIALLY_REFUNDED');
+  assert.equal(payment.amountRefundedUnits,5n);
+  assert.equal(payment.txHash,'0x');
+ }
+});

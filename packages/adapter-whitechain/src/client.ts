@@ -134,6 +134,15 @@ export class WhitechainAdapter {
 
     let txHash: `0x${string}` = "0x";
     try {
+      // Locate the payment timestamp before querying logs; RPCs cap event ranges.
+      let fromBlock = 0n;
+      let toBlock = await this.publicClient.getBlockNumber();
+      while (toBlock - fromBlock > 1999n) {
+        const middle = (fromBlock + toBlock) / 2n;
+        const block = await this.publicClient.getBlock({ blockNumber: middle });
+        if (block.timestamp < data.paidAt) fromBlock = middle + 1n;
+        else toBlock = middle;
+      }
       const logs = await this.publicClient.getLogs({
         address: this.contractAddress,
         event: {
@@ -150,7 +159,8 @@ export class WhitechainAdapter {
         args: {
           invoiceId,
         },
-        fromBlock: 0n,
+        fromBlock,
+        toBlock,
       });
       if (logs.length > 0 && logs[0].transactionHash) {
         txHash = logs[0].transactionHash;

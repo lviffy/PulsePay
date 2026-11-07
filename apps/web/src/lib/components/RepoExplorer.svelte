@@ -180,7 +180,6 @@
 				</button>
 			{/each}
 		</div>
-		<span class="mono ide-caption">This is the actual SDK.</span>
 		<div class="ide-keys">
 			<button onclick={() => (terminal = !terminal)} aria-label="Ctrl J: toggle terminal">
 				CTRL J

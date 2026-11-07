@@ -11,6 +11,7 @@
 	</a>
 	<span class="mono">Payments, with a paper trail.</span>
 	<div>
+		<a href="/merchant">Open console ↗</a>
 		<a href="/docs">Documentation ↗</a>
 		<a href="/docs/skills/pulsepay">Agent Skill ↗</a>
 		<a href="/llms.txt" data-sveltekit-reload rel="external">llms.txt ↗</a>
@@ -18,4 +19,16 @@
 	</div>
 	<small>© {new Date().getFullYear()} PulsePay</small>
 </footer>
+
+<style>
+	.site-footer.footer-dark {
+		padding-block: 32px;
+		gap: 20px;
+	}
+	@media (max-width: 767px) {
+		.site-footer.footer-dark {
+			padding-bottom: calc(32px + env(safe-area-inset-bottom));
+		}
+	}
+</style>
 

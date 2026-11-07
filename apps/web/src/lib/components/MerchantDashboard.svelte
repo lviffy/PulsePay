@@ -1144,7 +1144,7 @@
 						id="action-reason-input"
 						bind:value={reason}
 						rows="3"
-						style="width: 100%; background: transparent; border: 1px solid #747466; color: var(--cream); padding: 13px;"
+						style="width: 100%; background: transparent; border: 1px solid #747466; padding: 13px;"
 					></textarea>
 				{/if}
 

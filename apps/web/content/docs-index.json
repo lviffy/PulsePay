@@ -17,6 +17,14 @@
   },
   {
     "group": "Getting started",
+    "slug": "manual-testing",
+    "title": "Use and test the merchant console.",
+    "lede": "Every console control, merchant and customer payment tests, refunds, and the current limits of subscription, agent and bridge flows.",
+    "source": "apps/web/src/lib/components/MerchantDashboard.svelte",
+    "track": "Getting started"
+  },
+  {
+    "group": "Getting started",
     "slug": "architecture",
     "title": "Three tracks. Explicit boundaries.",
     "lede": "Follow value and evidence separately: contract state, transaction receipts, challenge redemption and audit consensus each answer a different question.",

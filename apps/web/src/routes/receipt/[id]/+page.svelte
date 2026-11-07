@@ -3,12 +3,14 @@
 	import { onMount } from 'svelte';
 	import { formatUnits } from 'viem';
 	import { WHITECHAIN_SEPOLIA_EXPLORER, type PaymentStatus } from '@pulsepay/shared';
+	import Mark from '$lib/components/Mark.svelte';
 
 	const id = $derived(page.params.id);
 
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let data = $state<{
+		evidenceWarning?: string | null;
 		invoice: { id: string; merchant: string };
 		payment: {
 			customer: string;
@@ -51,6 +53,9 @@
 
 <main id="main" class="receipt-page">
 	<div>
+		<a href="/" class="brand" style="margin-bottom: 24px; display: inline-flex;" aria-label="PulsePay home">
+			<Mark /> <span>PulsePay</span>
+		</a>
 		<p class="eyebrow" data-decode>PAYMENT / ONCHAIN EVIDENCE</p>
 		<h1>A payment.<br />A paper trail.</h1>
 		<p class="lede">
@@ -77,15 +82,12 @@
 				<button class="copy-button" onclick={fetchReceipt}>Retry ↗</button>
 			</div>
 		{:else if data}
-			<div class="receipt-evidence">
-				<a
-					href="{WHITECHAIN_SEPOLIA_EXPLORER}/tx/{data.payment.txHash}"
-					target="_blank"
-					rel="noreferrer"
-				>
-					{data.payment.txHash} ↗
-				</a>
-			</div>
+			{#if data.evidenceWarning}
+				<div class="checkout-error" role="status">
+					{data.evidenceWarning}
+					<button class="copy-button" onclick={fetchReceipt}>Retry transaction lookup ↗</button>
+				</div>
+			{/if}
 
 			<div class="receipt-sdk" data-no-split>
 				<section
@@ -97,7 +99,7 @@
 						style="display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 1px solid #d2d0c7; padding-bottom: 20px;"
 					>
 						<h3 style="font-size: 21px; margin: 0;">Customer receipt</h3>
-						<span style="font-family: var(--font-mono, monospace); fontSize: 9px;">
+						<span style="font-family: var(--font-mono, monospace); font-size: 9px;">
 							{data.payment.status.replaceAll('_', ' ')}
 						</span>
 					</div>

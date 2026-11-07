@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import Mark from '$lib/components/Mark.svelte';
 </script>
 
 <svelte:head>
@@ -7,6 +8,9 @@
 </svelte:head>
 
 <main id="main" class="not-found">
+	<a href="/" class="brand" style="margin-bottom: 24px; display: inline-flex;" aria-label="PulsePay home">
+		<Mark /> <span>PulsePay</span>
+	</a>
 	{#if page.status === 404}
 		<p class="eyebrow" data-decode>404 / NOT ON THIS CHAIN</p>
 		<h1>This route<br />didn’t settle.</h1>

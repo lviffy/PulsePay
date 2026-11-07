@@ -6,6 +6,7 @@
 	import SkillInstallWidget from '$lib/components/SkillInstallWidget.svelte';
 	import SdkInstallWidget from '$lib/components/SdkInstallWidget.svelte';
 	import ProceduralScenes from '$lib/components/ProceduralScenes.svelte';
+	import Mark from '$lib/components/Mark.svelte';
 	import { gsap, ScrollTrigger } from '$lib/motion';
 
 	interface Props {
@@ -95,7 +96,7 @@
 						refreshPriority: 1
 					}
 				})
-					.to('.hero-copy, .landing-minimap', { autoAlpha: 0, duration: 0.3 }, 0)
+					.to('.hero-copy', { autoAlpha: 0, duration: 0.3 }, 0)
 					.to('.hero-art', {
 						width: () => hero.clientWidth,
 						x: () => -hero.clientWidth / 2,
@@ -110,12 +111,6 @@
 						scrollTrigger: { trigger: '.cost-section', start: 'top 70%', end: 'bottom 65%', scrub: true }
 					})
 					.from('.cost-table tbody tr', { opacity: 0.15, stagger: 0.25, ease: 'none' });
-				gsap.to('.minimap-progress', {
-					scaleY: 1,
-					transformOrigin: 'top',
-					ease: 'none',
-					scrollTrigger: { trigger: scope, start: 'top top', end: 'bottom bottom', scrub: true }
-				});
 			});
 		}
 
@@ -137,6 +132,9 @@
 <main id="main" bind:this={scope}>
 	<section class="hero">
 		<div class="hero-copy">
+			<a href="/" class="brand hero-brand" aria-label="PulsePay home">
+				<Mark /> <span>PulsePay</span>
+			</a>
 			<p class="eyebrow">One SDK. Every payment.</p>
 			<h1 data-hero-title>Payments for <br />people. <br />And agents.</h1>
 			<p class="hero-lede">
@@ -152,17 +150,11 @@
 		</div>
 		<div class="hero-art" data-scene="rings">
 			<div class="hero-static" aria-hidden="true"></div>
-			<div class="hero-disc mono" aria-hidden="true">402</div>
+			<div class="hero-disc" aria-hidden="true" title="PulsePay">
+				<Mark class="hero-disc-mark" />
+			</div>
 			<div class="dither-rise" aria-hidden="true"></div>
 		</div>
-		<a href="#protocol" class="landing-minimap" aria-label="Jump to integration tools">
-			<div class="minimap-top mono">
-				<span>PulsePay / rails</span>
-				<span>↘</span>
-			</div>
-			<TokenFlow mini={true} />
-			<div class="minimap-track"><i class="minimap-progress"></i></div>
-		</a>
 	</section>
 
 	<section id="sdk" class="sdk-section section-pad">
@@ -194,30 +186,39 @@
 	<section class="cost-section section-pad">
 		<div>
 			<p class="eyebrow" data-decode>003 / THE COST OF FRICTION</p>
-			<h2>Count the steps. <br />Then remove them.</h2>
-			<div class="cost-number mono">[—]</div>
-			<p>Steps lost at checkout. Bring your own funnel data; we won’t invent the numbers.</p>
+			<h2>Less payment code. <br />More product.</h2>
+			<div class="cost-number mono">SDK</div>
+			<p>
+				Your app owns the experience. PulsePay handles invoice reads, token allowances,
+				settlement checks and refunds, with tools for agents to pay for services.
+			</p>
 		</div>
 		<div class="cost-table-wrap">
 			<table class="cost-table">
 				<thead>
 					<tr>
-						<th>Checkout step</th>
-						<th>Before</th>
-						<th>PulsePay</th>
+						<th>Integration task</th>
+						<th>Build yourself</th>
+						<th>With PulsePay</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each ['Choose a network', 'Find the right token', 'Work out the amount', 'Confirm payment', 'Get settlement proof'] as step, i (step)}
+					{#each [
+						['Read the invoice', 'Contract calls and status mapping', 'Amount, customer and due date'],
+						['Authorize tokens', 'Allowance checks and approvals', 'Approve when allowance is insufficient'],
+						['Confirm payment', 'Submit, wait and decode logs', 'Verify a matching settlement event'],
+						['Handle refunds', 'Payer checks and balance accounting', 'Full or partial refund to the payer'],
+						['Let agents pay', 'Challenge parsing and receipt verification', '402 tools with spend policy hooks']
+					] as [step, manual, pulsepay], i (step)}
 						<tr>
 							<td><span class="muted">0{i + 1}</span> {step}</td>
-							<td>[TBD]</td>
-							<td>[TBD]</td>
+							<td>{manual}</td>
+							<td>{pulsepay}</td>
 						</tr>
 					{/each}
 				</tbody>
 			</table>
-			<p class="mono small">[TBD] = measured figures pending. No performance claim.</p>
+			<p class="mono small">Direct checkout: USDT on Whitechain. Agent payments: Hedera. Wallet or agent signing is required.</p>
 		</div>
 	</section>
 

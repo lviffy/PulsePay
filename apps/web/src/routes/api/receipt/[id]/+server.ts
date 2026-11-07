@@ -24,10 +24,10 @@ export const GET: RequestHandler = async ({ params }) => {
 				}
 			);
 		}
-		if (!/^0x[a-fA-F0-9]{64}$/.test(payment.txHash)) {
-			throw new Error('Payment is recorded, but its transaction evidence could not be read. Retry.');
-		}
-		return new Response(stringify({ invoice, payment }), {
+		const evidenceWarning = /^0x[a-fA-F0-9]{64}$/.test(payment.txHash)
+			? null
+			: 'Payment details were read from the contract. The settlement transaction link is temporarily unavailable.';
+		return new Response(stringify({ invoice, payment, evidenceWarning }), {
 			headers: {
 				'Content-Type': 'application/json',
 				'Cache-Control': 'no-store'

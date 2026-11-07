@@ -12,6 +12,7 @@
 	];
 
 	let open = $state(false);
+	let footerVisible = $state(false);
 	let dock = $state<HTMLElement | null>(null);
 
 	const pathname = $derived(page.url.pathname);
@@ -23,6 +24,13 @@
 	});
 
 	onMount(() => {
+		const footer = document.querySelector('footer.site-footer');
+		const observer = new IntersectionObserver(([entry]) => {
+			footerVisible = entry.isIntersecting;
+			if (footerVisible) open = false;
+		}, { threshold: 0.25 });
+		if (footer) observer.observe(footer);
+
 		let last = window.scrollY;
 		const scroll = () => {
 			if (!merchant || !dock) return;
@@ -38,13 +46,14 @@
 		window.addEventListener('keydown', close);
 
 		return () => {
+			observer.disconnect();
 			window.removeEventListener('scroll', scroll);
 			window.removeEventListener('keydown', close);
 		};
 	});
 </script>
 
-<nav class="dock {merchant ? 'dock-merchant' : ''}" bind:this={dock} aria-label="Main navigation">
+<nav class="dock {merchant ? 'dock-merchant' : ''}" class:dock-footer-hidden={footerVisible} inert={footerVisible} bind:this={dock} aria-label="Main navigation">
 	<div class="dock-marquee" aria-label="Whitechain, Chainlink CCIP 2.0, Hedera x402">
 		<span>
 			<i class="status-dot"></i> ONCHAIN BY DESIGN · WHITECHAIN · CHAINLINK CCIP 2.0 · HEDERA X402 · ONCHAIN
@@ -94,4 +103,12 @@
 		</div>
 	{/if}
 </nav>
+
+<style>
+	.dock.dock-footer-hidden {
+		visibility: hidden;
+		opacity: 0;
+		pointer-events: none;
+	}
+</style>
 

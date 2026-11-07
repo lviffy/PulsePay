@@ -3,6 +3,7 @@ import { createWalletClient, custom, formatUnits, type EIP1193Provider } from "v
 import { whitechainSepolia, type Invoice } from "@pulsepay/sdk-core";
 import { usePulsePay } from "./context.js";
 import { WHITECHAIN_SEPOLIA_EXPLORER } from "@pulsepay/shared";
+import { PulsePayMark } from "./mark.js";
 
 export interface PulsePayCheckoutProps {
   invoiceId: string;
@@ -55,7 +56,7 @@ export function PulsePayCheckout({ invoiceId, enablePayWithAnyToken = false, onS
 
   const payable = invoice?.status === "OPEN" && invoice.dueAt > Date.now() / 1000;
   return <div className="sdk-widget">
-    <div className="sdk-widget-head"><h3>PulsePay checkout</h3><span className="sdk-network">Whitechain Sepolia</span></div>
+    <div className="sdk-widget-head"><div style={{ display: "flex", alignItems: "center" }}><PulsePayMark size={18} style={{ marginRight: 8 }} /><h3>PulsePay checkout</h3></div><span className="sdk-network">Whitechain Sepolia</span></div>
     {loading ? <p role="status">Reading invoice from Whitechain…</p> : invoice && <div className="sdk-total"><small>Amount due / USDT</small><div className="sdk-amount">{formatUnits(invoice.amountUnits, 6)}</div><div className="sdk-invoice-id">{invoice.id}</div><div className="sdk-invoice-id">{invoice.status} · Due {new Date(invoice.dueAt * 1000).toISOString()}</div></div>}
     {enablePayWithAnyToken && <p className="sdk-invoice-id">Other-token quotes are available through the server SDK. Cross-chain swap-to-invoice settlement is not yet supported. This checkout settles directly in USDT.</p>}
     {error && <div className="sdk-error" role="alert">{error}<br/><button type="button" className="sdk-retry" onClick={() => setAttempt(n => n + 1)} disabled={status === "PENDING"}>Retry invoice read</button></div>}
